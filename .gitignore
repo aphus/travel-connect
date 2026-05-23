@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment files - QUAN TRỌNG, không được commit lên GitHub
+.env
+.env.local
+.env.production
+
+# Build output
+dist/
+.next/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+
+# Logs
+*.log
