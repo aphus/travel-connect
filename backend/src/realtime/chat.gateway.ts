@@ -37,11 +37,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     this.logger.log(`Ping from ${client.id}: ${body.message}`);
     return {
-      event: 'pong',
-      data: {
-        message: 'Socket.io Gateway is working',
-        received: body.message,
-      },
+      success: true,
+      message: 'pong',
+      received: body,
+      socketId: client.id,
+      timestamp: new Date().toISOString(),
     };
   }
 }

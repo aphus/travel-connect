@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Khởi tạo instance với URL mặc định từ biến môi trường
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
