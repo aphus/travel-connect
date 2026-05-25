@@ -28,13 +28,13 @@ export default function MegaHomePage() {
     <div className="min-h-screen bg-slate-50 flex flex-col pb-12 font-sans">
 
       {/* 1. HERO BANNER (Phong cách cungdi.net) */}
-      <div className="relative w-full h-[60vh] bg-slate-900 flex items-center justify-center overflow-hidden">
+      <div className="relative w-full min-h-[75vh] bg-slate-900 flex flex-col items-center justify-center pb-24">
         {/* Ảnh nền khinh khí cầu/núi non */}
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-slate-50" />
 
-        <div className="relative z-10 text-center px-4 mt-[-8vh]">
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 drop-shadow-xl tracking-tight">
+        <div className="relative z-10 text-center px-4 pt-28 container mx-auto max-w-3xl">
+          <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 drop-shadow-xl tracking-tight leading-tight">
             GHÉP ĐÔI DU LỊCH, GHÉP NHÓM DU LỊCH
           </h1>
           <p className="text-lg md:text-xl text-slate-100 font-medium max-w-3xl mx-auto drop-shadow-md mb-10">

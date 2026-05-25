@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link"; // Bổ sung Link để xử lý chuyển trang
 import {
     Edit, Users, CheckCircle2, Clock, XCircle, MapPin, Navigation, Ban
 } from "lucide-react";
@@ -13,19 +14,25 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 
-// MOCK DATA (Đã chỉnh sửa để test logic thời gian)
+// Bổ sung các Component xử lý hành động (Đã chuẩn bị sẵn API-Ready)
+import ApprovalSheet from "@/components/trip/ApprovalSheet";
+import CancelTripAction from "@/components/trip/CancelTripAction";
+import LeaveTripAction from "@/components/trip/LeaveTripAction";
+import ManageMembersSheet from "@/components/trip/ManageMembersSheet";
+
+// MOCK DATA
 const MY_CREATED_TRIPS = [
     {
-        id: "1", title: "Khám phá Đà Lạt 3N2Đ: Săn mây và cắm trại", location: "Đà Lạt", startDate: "25/06/2026", // Tương lai
+        id: "1", title: "Khám phá Đà Lạt 3N2Đ: Săn mây và cắm trại", location: "Đà Lạt", startDate: "25/06/2026",
         status: "Đang mở", currentMembers: 3, maxMembers: 6, pendingRequests: 2,
     },
     {
-        id: "2", title: "Phượt xe máy Hà Giang - Sông Nho Quế", location: "Hà Giang", startDate: "10/05/2026", // Quá khứ (Đã bắt đầu/hoàn thành)
+        id: "2", title: "Phượt xe máy Hà Giang - Sông Nho Quế", location: "Hà Giang", startDate: "10/05/2026",
         status: "Đã chốt", currentMembers: 10, maxMembers: 10, pendingRequests: 0,
     },
     {
         id: "3", title: "Cắm trại hồ Trị An cuối tuần", location: "Đồng Nai", startDate: "15/07/2026",
-        status: "Đã hủy", currentMembers: 0, maxMembers: 5, pendingRequests: 0, // Đã hủy
+        status: "Đã hủy", currentMembers: 0, maxMembers: 5, pendingRequests: 0,
     }
 ];
 
@@ -36,10 +43,8 @@ const MY_JOINED_TRIPS = [
 ];
 
 export default function ManageTripsPage() {
-    // Lấy thời gian hiện tại để so sánh
     const currentDate = new Date();
 
-    // Hàm helper để so sánh ngày (Chuyển đổi dd/mm/yyyy sang Date object)
     const isTripInPast = (dateStr: string) => {
         const [day, month, year] = dateStr.split('/');
         const tripDate = new Date(`${year}-${month}-${day}`);
@@ -93,7 +98,6 @@ export default function ManageTripsPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {MY_CREATED_TRIPS.map((trip) => {
-                                        // Logic tính toán trạng thái vô hiệu hóa nút bấm
                                         const isPast = isTripInPast(trip.startDate);
                                         const isCancelled = trip.status === "Đã hủy";
                                         const isActionDisabled = isPast || isCancelled;
@@ -101,16 +105,19 @@ export default function ManageTripsPage() {
                                         return (
                                             <TableRow key={trip.id} className={`hover:bg-orange-50/30 transition-colors border-slate-100 ${isCancelled ? "opacity-70 grayscale-[30%]" : ""}`}>
                                                 <TableCell className="pl-6 py-5">
-                                                    <div className={`font-extrabold mb-1.5 text-base ${isCancelled ? "text-slate-500 line-through" : "text-slate-900"}`}>
+                                                    <Link
+                                                        href={`/trips/${trip.id}`}
+                                                        className={`font-extrabold mb-1.5 text-base inline-block hover:text-blue-600 transition-colors ${isCancelled ? "text-slate-500 line-through" : "text-slate-900"
+                                                            }`}
+                                                    >
                                                         {trip.title}
-                                                    </div>
+                                                    </Link>
                                                     <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
                                                         <span className="flex items-center gap-1.5"><MapPin className={`h-4 w-4 ${isCancelled ? "text-slate-400" : "text-orange-400"}`} /> {trip.location}</span>
                                                         <span className="flex items-center gap-1.5"><Clock className={`h-4 w-4 ${isCancelled ? "text-slate-400" : "text-blue-400"}`} /> {trip.startDate}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {/* Đổi màu Badge tùy theo trạng thái */}
                                                     <Badge className={`
                             ${trip.status === "Đang mở" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : ""}
                             ${trip.status === "Đã chốt" ? "bg-slate-200 text-slate-600 hover:bg-slate-300" : ""}
@@ -132,36 +139,65 @@ export default function ManageTripsPage() {
                                                 </TableCell>
                                                 <TableCell className="text-right pr-6">
                                                     <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            disabled={isActionDisabled}
-                                                            className="h-9 border-orange-200 text-orange-700 hover:bg-orange-50 font-bold disabled:opacity-50"
-                                                        >
-                                                            Duyệt đơn
-                                                        </Button>
+                                                        {/* Nút Duyệt Đơn (Chỉ active khi chuyến đi đang mở) */}
+                                                        <ApprovalSheet>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={isActionDisabled}
+                                                                className="h-9 border-orange-200 text-orange-700 hover:bg-orange-50 font-bold disabled:opacity-50"
+                                                            >
+                                                                Duyệt đơn
+                                                            </Button>
+                                                        </ApprovalSheet>
 
-                                                        {/* Nút Edit */}
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            disabled={isActionDisabled}
-                                                            title={isActionDisabled ? "Không thể sửa chuyến đi đã hủy hoặc đã bắt đầu" : "Sửa thông tin"}
-                                                            className="h-9 w-9 text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
+                                                        <ManageMembersSheet tripId={trip.id} isLeader={true}>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                title="Danh sách thành viên"
+                                                                className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                            >
+                                                                <Users className="h-4 w-4" />
+                                                            </Button>
+                                                        </ManageMembersSheet>
 
-                                                        {/* Nút Cancel (Thay thế cho nút Xóa cũ) */}
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            disabled={isActionDisabled}
-                                                            title={isActionDisabled ? "Không thể thao tác" : "Hủy chuyến đi"}
-                                                            className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        >
-                                                            <Ban className="h-4 w-4" />
-                                                        </Button>
+                                                        {/* Nút Edit (Chặn link nếu đã bị hủy/quá khứ) */}
+                                                        {isActionDisabled ? (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                disabled
+                                                                title="Không thể sửa chuyến đi đã hủy hoặc đã bắt đầu"
+                                                                className="h-9 w-9 text-slate-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        ) : (
+                                                            <Link href={`/trips/${trip.id}/edit`}>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    title="Sửa thông tin"
+                                                                    className="h-9 w-9 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                                >
+                                                                    <Edit className="h-4 w-4" />
+                                                                </Button>
+                                                            </Link>
+                                                        )}
+
+                                                        {/* Nút Cancel Trip (Bọc AlertDialog để xác nhận) */}
+                                                        <CancelTripAction tripId={trip.id}>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                disabled={isActionDisabled}
+                                                                title={isActionDisabled ? "Không thể thao tác" : "Hủy chuyến đi"}
+                                                                className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Ban className="h-4 w-4" />
+                                                            </Button>
+                                                        </CancelTripAction>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -172,9 +208,8 @@ export default function ManageTripsPage() {
                         </Card>
                     </TabsContent>
 
-                    {/* TAB 2: VAI TRÒ MEMBER (Giữ nguyên) */}
+                    {/* TAB 2: VAI TRÒ MEMBER */}
                     <TabsContent value="joined" className="space-y-4">
-                        {/* ... (Phần code hiển thị chuyến đi tham gia giữ nguyên như cũ) ... */}
                         <Card className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border-none overflow-hidden">
                             <Table>
                                 <TableHeader className="bg-slate-50/80">
@@ -189,7 +224,12 @@ export default function ManageTripsPage() {
                                     {MY_JOINED_TRIPS.map((trip) => (
                                         <TableRow key={trip.id} className="hover:bg-blue-50/30 transition-colors border-slate-100">
                                             <TableCell className="pl-6 py-5">
-                                                <div className="font-extrabold text-slate-900 mb-1.5 text-base">{trip.title}</div>
+                                                <Link
+                                                    href={`/trips/${trip.id}`}
+                                                    className="font-extrabold text-slate-900 mb-1.5 text-base inline-block hover:text-blue-600 transition-colors"
+                                                >
+                                                    {trip.title}
+                                                </Link>
                                                 <div className="text-sm text-slate-500 font-medium flex items-center gap-1.5">
                                                     <Clock className="h-4 w-4 text-blue-400" /> Khởi hành: {trip.startDate}
                                                 </div>
@@ -218,14 +258,19 @@ export default function ManageTripsPage() {
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right pr-6">
+                                                {/* Logic Nút cho Member */}
                                                 {trip.joinStatus === "Đã duyệt" ? (
-                                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-9 font-bold shadow-md">
-                                                        Vào nhóm Chat
-                                                    </Button>
+                                                    <Link href={`/chat/${trip.id}`}>
+                                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-9 font-bold shadow-md">
+                                                            Vào nhóm Chat
+                                                        </Button>
+                                                    </Link>
                                                 ) : (
-                                                    <Button variant="outline" size="sm" className="h-9 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border-rose-200 font-bold">
-                                                        Hủy yêu cầu
-                                                    </Button>
+                                                    <LeaveTripAction tripId={trip.id} status={trip.joinStatus === "Đang chờ" ? "PENDING" : "APPROVED"}>
+                                                        <Button variant="outline" size="sm" className="h-9 text-rose-500 hover:bg-rose-50 hover:text-rose-600 border-rose-200 font-bold">
+                                                            {trip.joinStatus === "Đang chờ" ? "Hủy yêu cầu" : "Xóa lịch sử"}
+                                                        </Button>
+                                                    </LeaveTripAction>
                                                 )}
                                             </TableCell>
                                         </TableRow>
