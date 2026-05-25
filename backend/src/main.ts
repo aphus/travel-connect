@@ -13,6 +13,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Cho phép frontend gọi API
   app.enableCors({
@@ -22,8 +23,6 @@ async function bootstrap() {
 
   // Prefix chung cho tất cả API
   app.setGlobalPrefix('api');
-
-  app.useGlobalFilters(new AllExceptionsFilter());
 
   const port = Number(process.env.PORT ?? 8000);
   await app.listen(port);
