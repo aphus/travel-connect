@@ -10,8 +10,11 @@ export class MessagesController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findByTrip(@Param('tripId') tripId: string) {
-    return this.messagesService.findByTrip(tripId);
+  findByTrip(
+    @Param('tripId') tripId: string,
+    @CurrentUser() user: { sub: string },
+  ) {
+    return this.messagesService.findByTrip(tripId, user.sub);
   }
 
   @UseGuards(JwtAuthGuard)
