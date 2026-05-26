@@ -1,20 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Compass, PlusCircle, Search, MapPin, Calendar, DollarSign, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 // MOCK DATA: Chuyến đi nổi bật để hiển thị trên Trang chủ
 const FEATURED_TRIPS = [
@@ -24,6 +17,29 @@ const FEATURED_TRIPS = [
 ];
 
 export default function MegaHomePage() {
+  const router = useRouter();
+
+  // Khởi tạo state để lưu trữ dữ liệu tìm kiếm
+  const [location, setLocation] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [budget, setBudget] = useState("");
+  const [members, setMembers] = useState("");
+
+  // Hàm xử lý khi ấn Tìm kiếm ngay
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Gắn dữ liệu vào query string
+    const params = new URLSearchParams();
+    if (location) params.set("location", location);
+    if (startDate) params.set("date", startDate);
+    if (budget) params.set("budget", budget);
+    if (members) params.set("members", members);
+
+    // Điều hướng người dùng sang trang Feed cùng với kết quả lọc
+    router.push(`/feed?${params.toString()}`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-12 font-sans">
 
@@ -57,9 +73,9 @@ export default function MegaHomePage() {
         </div>
       </div>
 
-      {/* 2. BỘ LỌC TÌM KIẾM (Nằm đè lên banner) */}
+      {/* 2. BỘ LỌC TÌM KIẾM (Nằm đè lên banner) - Đã chuyển thành Form */}
       <div className="container mx-auto px-4 -mt-20 relative z-20 max-w-6xl">
-        <div className="bg-white p-8 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
+        <form onSubmit={handleSearch} className="bg-white p-8 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
           <h2 className="text-xl font-bold text-rose-600 mb-6 text-center uppercase tracking-wide">
             Tìm kiếm bạn đồng hành du lịch
           </h2>
@@ -72,14 +88,24 @@ export default function MegaHomePage() {
               <label className="text-xs font-bold text-slate-500 uppercase">Địa điểm</label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Bạn muốn đi đâu?" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
+                <Input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Bạn muốn đi đâu?"
+                  className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                />
               </div>
             </div>
 
             {/* 2. Ngày khởi hành */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase">Ngày khởi hành</label>
-              <Input type="date" className="h-12 bg-white border border-slate-200 focus-visible:ring-rose-500 text-slate-600" />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-12 bg-white border border-slate-200 focus-visible:ring-rose-500 text-slate-600"
+              />
             </div>
 
             {/* 3. Ngân sách */}
@@ -87,7 +113,12 @@ export default function MegaHomePage() {
               <label className="text-xs font-bold text-slate-500 uppercase">Ngân sách dự kiến</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Mức chi phí" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
+                <Input
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  placeholder="Mức chi phí"
+                  className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                />
               </div>
             </div>
 
@@ -96,20 +127,26 @@ export default function MegaHomePage() {
               <label className="text-xs font-bold text-slate-500 uppercase">Số lượng thành viên</label>
               <div className="relative">
                 <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input type="number" placeholder="Số người tối đa" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
+                <Input
+                  type="number"
+                  value={members}
+                  onChange={(e) => setMembers(e.target.value)}
+                  placeholder="Số người tối đa"
+                  className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                />
               </div>
             </div>
 
           </div>
 
-          {/* NÚT TÌM KIẾM ĐẶT RIÊNG BIỆT PHÍA DƯỚI ĐỂ KHÔNG ẢNH HƯỞNG ĐẾN TỶ LỆ CỦA 4 Ô TRÊN */}
+          {/* NÚT TÌM KIẾM ĐẶT RIÊNG BIỆT PHÍA DƯỚI */}
           <div className="mt-6">
-            <Button className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-bold text-base shadow-md transition-all">
+            <Button type="submit" className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-bold text-base shadow-md transition-all">
               <Search className="mr-2 h-5 w-5" /> Tìm kiếm ngay
             </Button>
           </div>
 
-        </div>
+        </form>
       </div>
 
       {/* 3. BẢNG TIN CHUYẾN ĐI (FEED RÚT GỌN) */}

@@ -1,70 +1,134 @@
 "use client";
 
 import React, { useState } from "react";
-import { Star, Send, Loader2 } from "lucide-react";
-import {
-    Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
-} from "@/components/ui/sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+// Đổi từ Sheet sang Dialog để hiện popup ở giữa
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Star } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import ReportUserDialog from "@/components/report/ReportUserDialog";
+import { Flag } from "lucide-react";
 
-interface RatingMemberSheetProps {
-    tripId: string;
-    members: any[]; // Danh sách thành viên cần đánh giá
-    children: React.ReactNode;
+// Import sẵn api wrapper (Đang comment để chờ nối Backend)
+// import api from "@/services/api";
+
+interface Member {
+    id: string;
+    name: string;
+    avatar: string;
+    trustScore: number;
 }
 
-export default function RatingMemberSheet({ tripId, members, children }: RatingMemberSheetProps) {
-    const [ratings, setRatings] = useState<Record<string, { stars: number, comment: string }>>({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
+interface RatingMemberProps {
+    children: React.ReactNode;
+    tripId: string;
+    members: Member[];
+}
 
-    const handleRatingChange = (memberId: string, stars: number) => {
-        setRatings(prev => ({ ...prev, [memberId]: { ...prev[memberId], stars } }));
+export default function RatingMemberSheet({ children, tripId, members }: RatingMemberProps) {
+    // Quản lý state đánh giá cho từng thành viên
+    const [ratings, setRatings] = useState<Record<string, number>>({});
+    const [comments, setComments] = useState<Record<string, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
+
+    const handleRatingChange = (memberId: string, star: number) => {
+        setRatings((prev) => ({ ...prev, [memberId]: star }));
     };
 
-    const handleCommentChange = (memberId: string, comment: string) => {
-        setRatings(prev => ({ ...prev, [memberId]: { ...prev[memberId], comment } }));
+    const handleCommentChange = (memberId: string, value: string) => {
+        setComments((prev) => ({ ...prev, [memberId]: value }));
     };
 
-    const handleSubmit = async (memberId: string) => {
-        setIsSubmitting(true);
+    const handleSubmitRating = async (memberId: string) => {
+        const score = ratings[memberId] || 0;
+        const comment = comments[memberId] || "";
+
+        if (score === 0) {
+            alert("Vui lòng chọn số sao trước khi gửi đánh giá!");
+            return;
+        }
+
         /* ==========================================
-           BÀN GIAO CHO BẢO: GỌI API SUBMIT REVIEW (UC-08c)
-           POST /api/reviews
-           Payload: { reviewee_id: memberId, trip_id: tripId, rating: ratings[memberId].stars, ... }
-           Backend sẽ trả 409 Conflict nếu đã đánh giá rồi 
-        ========================================== */
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log(`Đã đánh giá thành viên ${memberId}:`, ratings[memberId]);
-        setIsSubmitting(false);
+           LOGIC KẾT NỐI BACKEND ĐÃ CHUẨN BỊ SẴN
+           ========================================== */
+
+        // setIsSubmitting((prev) => ({ ...prev, [memberId]: true }));
+        // try {
+        //     // Gọi API POST gửi đánh giá
+        //     const response = await api.post(`/trips/${tripId}/ratings`, {
+        //         targetUserId: memberId,
+        //         score: score,
+        //         comment: comment
+        //     });
+        //     
+        //     if (response.status === 201 || response.status === 200) {
+        //         alert("Gửi đánh giá thành công!");
+        //         // Có thể thêm logic ẩn form của user này đi sau khi đánh giá xong
+        //     }
+        // } catch (error) {
+        //     console.error("Lỗi khi gửi đánh giá:", error);
+        //     alert("Có lỗi xảy ra, vui lòng thử lại sau!");
+        // } finally {
+        //     setIsSubmitting((prev) => ({ ...prev, [memberId]: false }));
+        // }
+
+
+        // Giả lập UI lúc chưa có Backend
+        setIsSubmitting((prev) => ({ ...prev, [memberId]: true }));
+        setTimeout(() => {
+            alert(`Đã gửi đánh giá ${score} sao cho thành viên ${memberId}`);
+            setIsSubmitting((prev) => ({ ...prev, [memberId]: false }));
+        }, 800);
     };
 
     return (
-        <Sheet>
-            <SheetTrigger asChild>{children}</SheetTrigger>
-            <SheetContent className="w-full sm:max-w-md bg-slate-50 overflow-y-auto">
-                <SheetHeader className="mb-6">
-                    <SheetTitle>Đánh giá chuyến đi</SheetTitle>
-                </SheetHeader>
+        <Dialog>
+            <DialogTrigger asChild>
+                {children}
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="text-xl font-bold">Đánh giá thành viên</DialogTitle>
+                </DialogHeader>
 
-                <div className="space-y-6">
+                <div className="space-y-6 mt-4">
                     {members.map((member) => (
-                        <div key={member.id} className="bg-white p-4 rounded-2xl border shadow-sm">
+                        <div key={member.id} className="relative p-4 border rounded-xl shadow-sm bg-white">
+
+                            <div className="absolute top-4 right-4">
+                                <ReportUserDialog targetUserId={member.id} targetUserName={member.name}>
+                                    <button
+                                        className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
+                                        title="Báo cáo vi phạm"
+                                    >
+                                        <Flag className="w-5 h-5" />
+                                    </button>
+                                </ReportUserDialog>
+                            </div>
+
                             <div className="flex items-center gap-3 mb-4">
-                                <Avatar><AvatarFallback>{member.avatar}</AvatarFallback></Avatar>
+                                <Avatar>
+                                    <AvatarImage src={member.avatar} />
+                                    <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">
+                                        {member.name.substring(0, 2).toUpperCase()}
+                                    </AvatarFallback>
+                                </Avatar>
                                 <div>
                                     <h4 className="font-bold text-sm">{member.name}</h4>
-                                    <p className="text-xs text-slate-500">Trust Score: {member.trustScore}</p>
+                                    <p className="text-xs text-slate-500">Trust Score: <span className="text-amber-500 font-semibold">{member.trustScore}</span></p>
                                 </div>
                             </div>
 
-                            {/* Star Rating */}
+                            {/* Chấm sao */}
                             <div className="flex gap-1 mb-3">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                     <Star
                                         key={star}
-                                        className={`h-6 w-6 cursor-pointer ${(ratings[member.id]?.stars || 0) >= star ? "fill-amber-400 text-amber-400" : "text-slate-300"}`}
+                                        className={`w-6 h-6 cursor-pointer transition-colors ${(ratings[member.id] || 0) >= star
+                                            ? "fill-amber-400 text-amber-400"
+                                            : "text-slate-300"
+                                            }`}
                                         onClick={() => handleRatingChange(member.id, star)}
                                     />
                                 ))}
@@ -72,22 +136,22 @@ export default function RatingMemberSheet({ tripId, members, children }: RatingM
 
                             <Textarea
                                 placeholder="Nhận xét về thành viên này (tùy chọn)..."
-                                className="mb-3 text-sm"
+                                className="mb-3 resize-none"
+                                value={comments[member.id] || ""}
                                 onChange={(e) => handleCommentChange(member.id, e.target.value)}
                             />
 
                             <Button
-                                className="w-full"
-                                onClick={() => handleSubmit(member.id)}
-                                disabled={!ratings[member.id]?.stars || isSubmitting}
+                                className="w-full bg-slate-900 hover:bg-slate-800"
+                                onClick={() => handleSubmitRating(member.id)}
+                                disabled={isSubmitting[member.id]}
                             >
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                Gửi đánh giá
+                                {isSubmitting[member.id] ? "Đang gửi..." : "Gửi đánh giá"}
                             </Button>
                         </div>
                     ))}
                 </div>
-            </SheetContent>
-        </Sheet>
+            </DialogContent>
+        </Dialog>
     );
 }
