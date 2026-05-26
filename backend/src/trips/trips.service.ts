@@ -7,15 +7,23 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Trip, TripStatus } from './entities/trip.entity';
+import {
+  MemberRole,
+  MemberStatus,
+  TripMember,
+} from './entities/trip-member.entity';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { FilterTripsDto } from './dto/filter-trips.dto';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class TripsService {
   constructor(
     @InjectRepository(Trip)
     private readonly tripsRepository: Repository<Trip>,
+    @InjectRepository(TripMember)
+    private readonly tripMembersRepository: Repository<TripMember>,
   ) {}
 
   private validateTripDates(startDate: string, endDate: string) {
@@ -24,15 +32,25 @@ export class TripsService {
     }
   }
 
-  create(leaderId: string, dto: CreateTripDto) {
+  async create(leaderId: string, dto: CreateTripDto) {
     this.validateTripDates(dto.start_date, dto.end_date);
 
-    const trip = this.tripsRepository.create({
+    const createdTrip = this.tripsRepository.create({
       ...dto,
       leader_id: leaderId,
     });
 
-    return this.tripsRepository.save(trip);
+    const trip = await this.tripsRepository.save(createdTrip);
+    const leaderMember = this.tripMembersRepository.create({
+      trip,
+      user: { id: leaderId } as User,
+      role: MemberRole.LEADER,
+      status: MemberStatus.ACTIVE,
+    });
+
+    await this.tripMembersRepository.save(leaderMember);
+
+    return trip;
   }
 
   async findAll(filters: FilterTripsDto) {
