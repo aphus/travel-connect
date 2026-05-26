@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,18 +9,23 @@ import { Repository } from 'typeorm';
 import { Message } from './entities/message.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Trip } from '../trips/entities/trip.entity';
+import { MemberStatus, TripMember } from '../trips/entities/trip-member.entity';
 
 @Injectable()
 export class MessagesService {
   constructor(
     @InjectRepository(Message)
     private readonly messagesRepository: Repository<Message>,
+
     @InjectRepository(Trip)
     private readonly tripsRepository: Repository<Trip>,
+
+    @InjectRepository(TripMember)
+    private readonly tripMembersRepository: Repository<TripMember>,
   ) {}
 
-  async findByTrip(tripId: string) {
-    await this.ensureTripExists(tripId);
+  async findByTrip(tripId: string, userId: string) {
+    await this.ensureCanAccessTrip(tripId, userId);
 
     return this.messagesRepository.find({
       where: { trip_id: tripId },
@@ -41,28 +47,65 @@ export class MessagesService {
   }
 
   async create(tripId: string, senderId: string, dto: CreateMessageDto) {
-    await this.ensureTripExists(tripId);
+    await this.ensureCanAccessTrip(tripId, senderId);
 
-    const content = dto.content.trim();
+    const content = dto.content?.trim();
+
     if (!content) {
       throw new BadRequestException('Message content cannot be empty');
     }
 
-    // TODO: After TripMembers module is merged, validate sender is an active member of this trip.
     const message = this.messagesRepository.create({
       trip_id: tripId,
       sender_id: senderId,
       content,
     });
 
-    return this.messagesRepository.save(message);
+    const savedMessage = await this.messagesRepository.save(message);
+
+    return this.messagesRepository.findOneOrFail({
+      where: { id: savedMessage.id },
+      relations: ['sender'],
+      select: {
+        id: true,
+        trip_id: true,
+        sender_id: true,
+        content: true,
+        created_at: true,
+        sender: {
+          id: true,
+          full_name: true,
+          avatar_url: true,
+        },
+      },
+    });
+  }
+
+  async ensureCanAccessTrip(tripId: string, userId: string) {
+    await this.ensureTripExists(tripId);
+
+    const membership = await this.tripMembersRepository.findOne({
+      where: {
+        trip: { id: tripId },
+        user: { id: userId },
+        status: MemberStatus.ACTIVE,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('Only active trip members can access chat');
+    }
   }
 
   private async ensureTripExists(tripId: string) {
-    const trip = await this.tripsRepository.findOne({ where: { id: tripId } });
+    const trip = await this.tripsRepository.findOne({
+      where: { id: tripId },
+    });
+
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
+
     return trip;
   }
 }

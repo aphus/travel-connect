@@ -137,6 +137,32 @@ export class TripsService {
     return this.findOne(tripId);
   }
 
+  async markCompletedByLeader(tripId: string, userId: string) {
+    const trip = await this.findOne(tripId);
+
+    if (trip.leader_id !== userId) {
+      throw new ForbiddenException('Only leader can mark this trip as completed');
+    }
+
+    if (trip.status === TripStatus.CANCELLED) {
+      throw new BadRequestException('Cancelled trips cannot be marked completed');
+    }
+
+    if (trip.status === TripStatus.COMPLETED) {
+      throw new BadRequestException('Completed trips cannot be marked completed again');
+    }
+
+    if (![TripStatus.UPCOMING, TripStatus.ONGOING].includes(trip.status)) {
+      throw new BadRequestException('Only upcoming or ongoing trips can be marked completed');
+    }
+
+    await this.tripsRepository.update(tripId, {
+      status: TripStatus.AWAITING_CONFIRMATION,
+    });
+
+    return this.findOne(tripId);
+  }
+
   async cancelByAdmin(tripId: string) {
     const trip = await this.findOne(tripId);
 

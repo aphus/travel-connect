@@ -12,6 +12,7 @@ import { User } from '../../users/entities/user.entity';
 export enum TripStatus {
   UPCOMING = 'upcoming',
   ONGOING = 'ongoing',
+  AWAITING_CONFIRMATION = 'awaiting_confirmation',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
 }
