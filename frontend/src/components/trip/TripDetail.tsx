@@ -3,13 +3,19 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { MapPin, Calendar, DollarSign, Users, Navigation } from "lucide-react";
-import TripCompletionAction from "./TripCompletionAction";
-import JoinTripButton from "./JoinTripButton";
+import TripActionPanel from "./TripActionPanel";
+
 
 export default function TripDetail({ tripId, tripData }: { tripId: string, tripData: any }) {
+
+    // BƯỚC 2: Tạo biến giả lập (Mock) phân quyền để test giao diện
+    // (Sau này khi nối Backend, ta sẽ lấy từ Context/Redux)
+    const isLeader = false;   // Đổi thành false để test góc nhìn thành viên
+    const isMember = true;  // Đổi thành false, isLeader = false để test góc nhìn người lạ (Guest)
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Cột trái: Nội dung */}
+            {/* Cột trái: Nội dung (Giữ nguyên) */}
             <div className="lg:col-span-2">
                 <Card className="p-8 rounded-3xl border-none shadow-sm">
                     <h1 className="text-3xl font-extrabold mb-6">{tripData.title}</h1>
@@ -24,15 +30,33 @@ export default function TripDetail({ tripId, tripData }: { tripId: string, tripD
             </div>
 
             {/* Cột phải: Sidebar hành động */}
+            {/* <div className="lg:col-span-1"> */}
+            {/* BƯỚC 3: Dùng duy nhất TripActionPanel và truyền props vào */}
+            {/* <TripActionPanel
+                    trip={tripData}
+                    isLeader={isLeader}
+                    isMember={isMember}
+                />
+            </div> */}
+
+            {/* Cột phải: Sidebar hành động */}
             <div className="lg:col-span-1">
-                <Card className="p-6 rounded-3xl shadow-sm border sticky top-24">
-                    <h3 className="font-bold mb-4">Người dẫn đoàn</h3>
-                    <div className="space-y-4">
-                        <TripCompletionAction tripId={tripId} initialStatus="ONGOING" isLeader={true} />
-                        <JoinTripButton tripId={tripId} initialStatus="NONE" />
-                    </div>
-                </Card>
+                {/* Ép dữ liệu giả để test UI */}
+                <TripActionPanel
+                    trip={{
+                        ...tripData,
+                        status: "UPCOMING", // Ép trạng thái thành Đang diễn ra
+                        leader: {
+                            name: "Đình Thạch",
+                            trustScore: 99,
+                            avatar: ""
+                        }
+                    }}
+                    isLeader={isLeader}
+                    isMember={isMember}
+                />
             </div>
+
         </div>
     );
 }

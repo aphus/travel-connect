@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, MapPin, DollarSign, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import TripCard from "@/components/trip/TripCard"; // Import component thẻ chuyến đi chúng ta đã làm trước đó
+import TripCard from "@/components/trip/TripCard";
 
 // MOCK DATA: Dữ liệu giả lập cho Bảng tin
 const MOCK_TRIPS = [
@@ -46,10 +47,42 @@ const MOCK_TRIPS = [
     }
 ];
 
-export default function FeedPage() {
+// Tạo Component con chứa logic để có thể bọc Suspense
+function FeedContent() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // 1. Khởi tạo state từ URL (để giữ lại chữ người dùng đã gõ sau khi tải lại trang)
+    const [location, setLocation] = useState(searchParams.get("location") || "");
+    const [startDate, setStartDate] = useState(searchParams.get("date") || "");
+    const [budget, setBudget] = useState(searchParams.get("budget") || "");
+    const [members, setMembers] = useState(searchParams.get("members") || "");
+
+    // 2. Logic cập nhật URL khi bấm Tìm kiếm
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        const params = new URLSearchParams();
+        if (location) params.set("location", location);
+        if (startDate) params.set("date", startDate);
+        if (budget) params.set("budget", budget);
+        if (members) params.set("members", members);
+
+        router.push(`/feed?${params.toString()}`);
+    };
+
+    // 3. Logic lọc mảng MOCK_TRIPS dựa trên URL hiện tại
+    const queryLocation = searchParams.get("location")?.toLowerCase() || "";
+    const filteredTrips = MOCK_TRIPS.filter((trip) => {
+        if (!queryLocation) return true;
+        // Kiểm tra xem chữ gõ vào có nằm trong Tên chuyến đi hoặc Địa điểm không
+        return (
+            trip.location.toLowerCase().includes(queryLocation) ||
+            trip.title.toLowerCase().includes(queryLocation)
+        );
+    });
+
     return (
         <div className="container mx-auto px-4 py-8 max-w-7xl">
-
             {/* TIÊU ĐỀ TRANG */}
             <div className="mb-8">
                 <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Khám phá chuyến đi</h1>
@@ -58,23 +91,32 @@ export default function FeedPage() {
                 </p>
             </div>
 
-            {/* BỘ LỌC TÌM KIẾM ĐỒNG BỘ VỚI TRANG CHỦ */}
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 mb-10">
+            {/* BỘ LỌC TÌM KIẾM - Đã bọc bằng form */}
+            <form onSubmit={handleSearch} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 mb-10">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-
                     {/* 1. Địa điểm */}
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase">Địa điểm</label>
                         <div className="relative">
                             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input placeholder="Bạn muốn đi đâu?" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
+                            <Input
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                placeholder="Bạn muốn đi đâu?"
+                                className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                            />
                         </div>
                     </div>
 
                     {/* 2. Ngày khởi hành */}
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-500 uppercase">Ngày khởi hành</label>
-                        <Input type="date" className="h-12 bg-white border border-slate-200 focus-visible:ring-rose-500 text-slate-600" />
+                        <Input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="h-12 bg-white border border-slate-200 focus-visible:ring-rose-500 text-slate-600"
+                        />
                     </div>
 
                     {/* 3. Ngân sách */}
@@ -82,7 +124,12 @@ export default function FeedPage() {
                         <label className="text-xs font-bold text-slate-500 uppercase">Ngân sách dự kiến</label>
                         <div className="relative">
                             <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input placeholder="Mức chi phí" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
+                            <Input
+                                value={budget}
+                                onChange={(e) => setBudget(e.target.value)}
+                                placeholder="Mức chi phí"
+                                className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                            />
                         </div>
                     </div>
 
@@ -91,27 +138,46 @@ export default function FeedPage() {
                         <label className="text-xs font-bold text-slate-500 uppercase">Số lượng thành viên</label>
                         <div className="relative">
                             <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input type="number" placeholder="Số người tối đa" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
+                            <Input
+                                type="number"
+                                value={members}
+                                onChange={(e) => setMembers(e.target.value)}
+                                placeholder="Số người tối đa"
+                                className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                            />
                         </div>
                     </div>
-
                 </div>
 
                 {/* Nút tìm kiếm */}
                 <div className="mt-6">
-                    <Button className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-bold text-base shadow-md transition-all">
+                    <Button type="submit" className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-bold text-base shadow-md transition-all">
                         <Search className="mr-2 h-5 w-5" /> Tìm kiếm ngay
                     </Button>
                 </div>
-            </div>
+            </form>
 
-            {/* DANH SÁCH CHUYẾN ĐI (Dùng chung component TripCard) */}
+            {/* DANH SÁCH CHUYẾN ĐI LỌC THEO TỪ KHÓA */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {MOCK_TRIPS.map((trip) => (
-                    <TripCard key={trip.id} trip={trip} />
-                ))}
+                {filteredTrips.length > 0 ? (
+                    filteredTrips.map((trip) => (
+                        <TripCard key={trip.id} trip={trip} />
+                    ))
+                ) : (
+                    <div className="col-span-full py-16 text-center text-slate-500">
+                        Không tìm thấy chuyến đi nào khớp với từ khóa "{queryLocation}".
+                    </div>
+                )}
             </div>
-
         </div>
+    );
+}
+
+// Component chính export ra ngoài
+export default function FeedPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Đang tải bảng tin...</div>}>
+            <FeedContent />
+        </Suspense>
     );
 }

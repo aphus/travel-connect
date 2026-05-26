@@ -11,9 +11,9 @@ const api = axios.create({
 // Interceptor cho Request: Tự động nhét JWT Token vào header trước khi gửi API
 api.interceptors.request.use(
   (config) => {
-    // Lấy token từ localStorage
+    // Lấy token từ localStorage (chỉ chạy trên Client)
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -29,8 +29,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Logic xử lý khi Token hết hạn hoặc không hợp lệ (VD: Điều hướng về trang Login)
       console.error("Unauthorized! Token không hợp lệ hoặc đã hết hạn.");
+
+      // Đảm bảo chỉ thực thi trên môi trường Client
+      if (typeof window !== 'undefined') {
+        // Xóa Token lỗi/hết hạn ra khỏi bộ nhớ
+        localStorage.removeItem('accessToken');
+
+        // Điều hướng thẳng về trang Login
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

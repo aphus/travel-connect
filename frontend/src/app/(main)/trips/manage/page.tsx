@@ -47,8 +47,11 @@ export default function ManageTripsPage() {
 
     const isTripInPast = (dateStr: string) => {
         const [day, month, year] = dateStr.split('/');
-        const tripDate = new Date(`${year}-${month}-${day}`);
-        return tripDate < currentDate;
+        const tripDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
+        const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+
+        return tripDate < today;
     };
 
     return (
