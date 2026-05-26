@@ -5,19 +5,34 @@ import { useRouter } from "next/navigation";
 import { Mail, Lock, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import api from "@/services/api";
+import { setAuthToken } from "@/services/authToken";
 
 export default function LoginForm() {
     const router = useRouter();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        setError("");
 
-        // Giả lập xử lý đăng nhập, sau 1s chuyển về Trang chủ
-        setTimeout(() => {
-            router.push("/");
-        }, 1000);
+        try {
+            const response = await api.post<{ access_token: string }>("/auth/login", {
+                email,
+                password,
+            });
+
+            setAuthToken(response.data.access_token);
+            router.push("/feed");
+        } catch {
+            setError("Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -29,6 +44,8 @@ export default function LoginForm() {
                         type="email"
                         required
                         placeholder="Email của bạn"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         className="h-14 bg-white/10 border-white/20 text-white placeholder:text-white/40 pl-12 rounded-2xl focus-visible:ring-blue-500 focus-visible:bg-white/20 transition-all"
                     />
                 </div>
@@ -41,6 +58,8 @@ export default function LoginForm() {
                         type="password"
                         required
                         placeholder="Mật khẩu"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         className="h-14 bg-white/10 border-white/20 text-white placeholder:text-white/40 pl-12 rounded-2xl focus-visible:ring-blue-500 focus-visible:bg-white/20 transition-all"
                     />
                 </div>
@@ -48,6 +67,10 @@ export default function LoginForm() {
                     <button type="button" className="text-xs text-white/60 hover:text-white">Quên mật khẩu?</button>
                 </div>
             </div>
+
+            {error && (
+                <p className="text-sm text-red-200">{error}</p>
+            )}
 
             <Button
                 type="submit"
