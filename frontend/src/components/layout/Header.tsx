@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Compass, UserCircle, LayoutList, LogOut, Menu, LogIn, MessageCircle, Bell } from "lucide-react";
 import {
     DropdownMenu,
@@ -13,11 +13,67 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { clearAccessToken, getAccessToken } from "@/services/fetchWrapper";
+import { getCurrentUser, getStoredAuthUser, storeAuthUser, type AuthUser } from "@/services/auth";
+import { getUserInitials } from "@/lib/user";
 
 
 export default function SmartHeader() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
     const pathname = usePathname();
+    const router = useRouter();
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const syncAuthState = async () => {
+            const token = getAccessToken();
+            const storedUser = getStoredAuthUser();
+
+            if (!token) {
+                setIsLoggedIn(false);
+                setCurrentUser(null);
+                return;
+            }
+
+            setIsLoggedIn(true);
+            if (storedUser) setCurrentUser(storedUser);
+
+            try {
+                const freshUser = await getCurrentUser();
+                if (!isMounted) return;
+
+                setCurrentUser(freshUser);
+                storeAuthUser(freshUser, false);
+            } catch {
+                if (!isMounted) return;
+
+                clearAccessToken();
+                setIsLoggedIn(false);
+                setCurrentUser(null);
+            }
+        };
+
+        void syncAuthState();
+        window.addEventListener("storage", syncAuthState);
+        window.addEventListener("auth-token-changed", syncAuthState);
+        window.addEventListener("auth-user-changed", syncAuthState);
+
+        return () => {
+            isMounted = false;
+            window.removeEventListener("storage", syncAuthState);
+            window.removeEventListener("auth-token-changed", syncAuthState);
+            window.removeEventListener("auth-user-changed", syncAuthState);
+        };
+    }, []);
+
+    const handleLogout = () => {
+        clearAccessToken();
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+        router.push("/login");
+    };
 
     // 1. Ẩn Header ở trang Login / Register
     if (pathname === "/login" || pathname === "/register") {
@@ -89,14 +145,23 @@ export default function SmartHeader() {
                                         <Menu className="h-5 w-5 text-slate-700" />
                                         <Avatar className="h-8 w-8 border-0 rounded-full">
                                             <AvatarFallback className="bg-slate-800 text-white font-bold rounded-full text-xs">
-                                                ĐT
+                                                {getUserInitials(currentUser)}
                                             </AvatarFallback>
                                         </Avatar>
                                     </button>
                                 </DropdownMenuTrigger>
 
                                 <DropdownMenuContent align="end" className="w-56 mt-4 border-slate-100 shadow-xl rounded-2xl bg-white p-2">
-                                    <DropdownMenuLabel className="font-bold text-slate-900 px-4 py-2">Tài khoản của tôi</DropdownMenuLabel>
+                                    <DropdownMenuLabel className="px-4 py-2">
+                                        <span className="block font-bold text-slate-900 truncate">
+                                            {currentUser?.fullName ?? "Tài khoản của tôi"}
+                                        </span>
+                                        {currentUser?.email && (
+                                            <span className="block text-xs font-medium text-slate-500 truncate">
+                                                {currentUser.email}
+                                            </span>
+                                        )}
+                                    </DropdownMenuLabel>
                                     <DropdownMenuSeparator className="bg-slate-100" />
                                     <Link href="/profile">
                                         <DropdownMenuItem className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl hover:bg-slate-50">
@@ -109,7 +174,7 @@ export default function SmartHeader() {
                                         </DropdownMenuItem>
                                     </Link>
                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                    <DropdownMenuItem onClick={() => setIsLoggedIn(false)} className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl text-red-600 focus:text-red-600 focus:bg-red-50">
+                                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl text-red-600 focus:text-red-600 focus:bg-red-50">
                                         <LogOut className="h-4 w-4" /> Đăng xuất
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -126,7 +191,7 @@ export default function SmartHeader() {
                                 Đăng ký
                             </Link>
                             <Link href="/login">
-                                <button onClick={() => setIsLoggedIn(true)} className="flex items-center gap-2 bg-blue-600 text-white font-extrabold text-sm px-6 py-2.5 rounded-full shadow-md hover:bg-blue-700 hover:-translate-y-0.5 transition-all duration-200">
+                                <button className="flex items-center gap-2 bg-blue-600 text-white font-extrabold text-sm px-6 py-2.5 rounded-full shadow-md hover:bg-blue-700 hover:-translate-y-0.5 transition-all duration-200">
                                     <LogIn className="h-4 w-4 stroke-[3]" />
                                     Đăng nhập
                                 </button>

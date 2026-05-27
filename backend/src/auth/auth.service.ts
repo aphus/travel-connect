@@ -1,5 +1,6 @@
 import {
-  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -26,14 +27,14 @@ export class AuthService {
     };
 
     return {
-      access_token: this.jwtService.sign(payload),
+      accessToken: this.jwtService.sign(payload),
       user: {
         id: user.id,
         email: user.email,
-        full_name: user.full_name,
-        avatar_url: user.avatar_url,
+        fullName: user.full_name,
+        avatarUrl: user.avatar_url,
         role: user.role,
-        trust_score: user.trust_score,
+        trustScore: Number(user.trust_score),
       },
     };
   }
@@ -41,35 +42,43 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const existingUser = await this.usersService.findByEmail(dto.email);
     if (existingUser) {
-      throw new BadRequestException('Email is already registered');
+      throw new ConflictException('Email đã được sử dụng');
     }
 
     const password_hash = await bcrypt.hash(dto.password, 10);
 
-    const user = await this.usersService.create({
-      email: dto.email,
-      password_hash,
-      full_name: dto.full_name,
-      role: UserRole.USER,
-    });
+    try {
+      const user = await this.usersService.create({
+        email: dto.email,
+        password_hash,
+        full_name: dto.fullName,
+        role: UserRole.USER,
+      });
 
-    return this.buildAuthResponse(user);
+      return this.buildAuthResponse(user);
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new ConflictException('Email đã được sử dụng');
+      }
+
+      throw error;
+    }
   }
 
   async login(dto: LoginDto) {
     const user = await this.usersService.findByEmail(dto.email);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
     if (user.is_banned) {
-      throw new UnauthorizedException('Your account is banned');
+      throw new ForbiddenException('Tài khoản đã bị khóa');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
     return this.buildAuthResponse(user);
@@ -79,7 +88,7 @@ export class AuthService {
     const user = await this.usersService.findById(payload.sub);
 
     if (user.is_banned) {
-      throw new UnauthorizedException('Your account is banned');
+      throw new ForbiddenException('Tài khoản đã bị khóa');
     }
 
     return {
@@ -87,5 +96,14 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
+  }
+
+  private isUniqueConstraintError(error: unknown) {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === '23505'
+    );
   }
 }
