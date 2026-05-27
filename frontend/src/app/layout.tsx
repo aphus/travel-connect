@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { SocketProvider } from "@/contexts/SocketProvider";
+import AuthFlash from "@/components/auth/AuthFlash";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({
         <SocketProvider>
           {/* Thanh điều hướng Header */}
           <Header />
+          <AuthFlash />
 
           {/* Phần nội dung chính của trang web */}
           <main className="flex-1 flex flex-col">

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAccessToken, getAccessToken } from './fetchWrapper';
 
 // Khởi tạo instance với URL mặc định từ biến môi trường
 const api = axios.create({
@@ -11,8 +12,7 @@ const api = axios.create({
 // Interceptor cho Request: Tự động nhét JWT Token vào header trước khi gửi API
 api.interceptors.request.use(
   (config) => {
-    // Lấy token từ localStorage (chỉ chạy trên Client)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const token = getAccessToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -34,7 +34,7 @@ api.interceptors.response.use(
       // Đảm bảo chỉ thực thi trên môi trường Client
       if (typeof window !== 'undefined') {
         // Xóa Token lỗi/hết hạn ra khỏi bộ nhớ
-        localStorage.removeItem('accessToken');
+        clearAccessToken();
 
         // Điều hướng thẳng về trang Login
         window.location.href = '/login';
