@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-    CalendarDays,
     CheckCircle,
     FolderPlus,
     Loader2,
@@ -31,6 +30,8 @@ import {
 } from "@/services/auth";
 import { ApiError } from "@/services/fetchWrapper";
 import { getUserInitials } from "@/lib/user";
+import UserReviews from "@/components/review/UserReviews";
+import { getUserReviews, type UserReview } from "@/services/reviews";
 
 const profileSchema = z.object({
     name: z.string().min(2, { message: "Tên phải có ít nhất 2 ký tự" }),
@@ -38,15 +39,10 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-const MOCK_REVIEWS = [
-    { id: "1", author: "Minh Phương", rating: 5, date: "15/04/2026", comment: "Leader rất có trách nhiệm, chuẩn bị lịch trình chi tiết và chăm sóc thành viên cực tốt suốt chuyến đi Hà Giang." },
-    { id: "2", author: "Tuấn Anh", rating: 4, date: "28/03/2026", comment: "Vui tính, hòa đồng, lái xe rất vững xế tốt trên các cung đường phượt đèo dốc." },
-    { id: "3", author: "Khánh Linh", rating: 5, date: "10/01/2026", comment: "Cực kỳ sòng phẳng về chi phí, đúng giờ và luôn hỗ trợ mọi người chụp ảnh sống ảo." }
-];
-
 export default function EnhancedProfilePage() {
     const router = useRouter();
     const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+    const [reviews, setReviews] = useState<UserReview[]>([]);
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [statusMessage, setStatusMessage] = useState("");
 
@@ -73,6 +69,13 @@ export default function EnhancedProfilePage() {
                 setCurrentUser(user);
                 storeAuthUser(user);
                 reset({ name: user.fullName });
+
+                try {
+                    const userReviews = await getUserReviews(user.id);
+                    if (isMounted) setReviews(userReviews);
+                } catch {
+                    if (isMounted) setReviews([]);
+                }
             } catch (error) {
                 if (!isMounted) return;
 
@@ -165,7 +168,7 @@ export default function EnhancedProfilePage() {
                         <div className="grid grid-cols-3 w-full gap-2 text-center mt-4 border-t pt-4 border-slate-200/60">
                             <div className="flex flex-col items-center justify-center">
                                 <div className="flex items-center gap-1 text-slate-700 font-extrabold text-lg">
-                                    <MessageSquare className="h-4 w-4 text-blue-500" /> 0
+                                    <MessageSquare className="h-4 w-4 text-blue-500" /> {reviews.length}
                                 </div>
                                 <span className="text-[11px] font-medium text-slate-500 uppercase mt-0.5">Nhận xét</span>
                             </div>
@@ -177,7 +180,7 @@ export default function EnhancedProfilePage() {
                             </div>
                             <div className="flex flex-col items-center justify-center">
                                 <div className="flex items-center gap-1 text-slate-700 font-extrabold text-lg">
-                                    <FolderPlus className="h-4 w-4 text-orange-500" /> 0
+                                    <FolderPlus className="h-4 w-4 text-orange-500" /> {currentUser?.tripsCreated ?? 0}
                                 </div>
                                 <span className="text-[11px] font-medium text-slate-500 uppercase mt-0.5">Đã tạo</span>
                             </div>
@@ -221,35 +224,7 @@ export default function EnhancedProfilePage() {
 
                     <Separator className="w-full my-8" />
 
-                    <div className="w-full text-left space-y-4">
-                        <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide mb-2">Đánh giá từ thành viên</h3>
-
-                        <div className="space-y-4">
-                            {MOCK_REVIEWS.map((review) => (
-                                <div key={review.id} className="bg-slate-50/60 border border-slate-100 rounded-xl p-4 shadow-2xs">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
-                                                {review.author.charAt(0)}
-                                            </div>
-                                            <span className="font-bold text-slate-800 text-sm">{review.author}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-                                            <div className="flex items-center text-amber-400">
-                                                {Array.from({ length: review.rating }).map((_, i) => (
-                                                    <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                                ))}
-                                            </div>
-                                            <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> {review.date}</span>
-                                        </div>
-                                    </div>
-                                    <p className="text-slate-600 text-sm leading-relaxed pl-9">
-                                        "{review.comment}"
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <UserReviews reviews={reviews} />
                 </CardContent>
             </Card>
         </div>

@@ -13,8 +13,9 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cancelTrip } from "@/services/trips";
 
-export default function CancelTripAction({ tripId, children }: { tripId: string, children: React.ReactNode }) {
+export default function CancelTripAction({ tripId, children, onSuccess }: { tripId: string, children: React.ReactNode, onSuccess?: () => void }) {
     const [isCanceling, setIsCanceling] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
@@ -23,20 +24,8 @@ export default function CancelTripAction({ tripId, children }: { tripId: string,
         setIsCanceling(true);
 
         try {
-            /* ==========================================
-               GỌI API BACKEND (UC-03 Hủy chuyến đi)
-            ========================================== */
-            // const response = await fetch(`/api/trips/${tripId}/cancel`, {
-            //   method: "POST", // Hoặc DELETE/PATCH
-            //   headers: { "Content-Type": "application/json" },
-            // });
-            // if (!response.ok) throw new Error("Hủy chuyến đi thất bại");
-
-            /* GIẢ LẬP FRONTEND (Xóa khi có API) */
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            console.log(`Đã hủy chuyến đi: ${tripId}`);
-            // TODO: Cập nhật lại danh sách chuyến đi hoặc báo thành công
+            await cancelTrip(tripId);
+            onSuccess?.();
             setIsOpen(false);
         } catch (error) {
             console.error("Lỗi:", error);

@@ -7,6 +7,7 @@ export type AuthUser = {
   avatarUrl: string | null;
   role: string;
   trustScore: number;
+  tripsCreated: number;
   isBanned?: boolean;
 };
 
@@ -104,6 +105,8 @@ type RawAuthUser = {
   avatar_url?: string | null;
   trustScore?: number | string;
   trust_score?: number | string;
+  tripsCreated?: number;
+  trips_created?: number;
   isBanned?: boolean;
   is_banned?: boolean;
 };
@@ -116,6 +119,7 @@ function normalizeAuthUser(user: RawAuthUser): AuthUser {
     avatarUrl: user.avatarUrl ?? user.avatar_url ?? null,
     role: user.role,
     trustScore: Number(user.trustScore ?? user.trust_score ?? 0),
+    tripsCreated: Number(user.tripsCreated ?? user.trips_created ?? 0),
     isBanned: user.isBanned ?? user.is_banned,
   };
 }

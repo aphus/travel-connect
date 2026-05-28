@@ -13,6 +13,7 @@ export class UsersService {
         full_name: user.full_name,
         avatar_url: user.avatar_url,
         trust_score: user.trust_score,
+        tripsCreated: user.tripsCreated,
         role: user.role,
         is_banned: user.is_banned,
         created_at: user.created_at,
@@ -36,6 +37,7 @@ export class UsersService {
         'role',
         'is_banned',
         'trust_score',
+        'tripsCreated',
         'created_at',
       ],
     });

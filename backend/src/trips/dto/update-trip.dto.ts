@@ -1,12 +1,14 @@
 import {
   IsDateString,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateTripDto {
   @IsOptional()
@@ -16,22 +18,24 @@ export class UpdateTripDto {
 
   @IsOptional()
   @IsDateString()
-  start_date?: string;
+  startDate?: string;
 
   @IsOptional()
   @IsDateString()
-  end_date?: string;
+  endDate?: string;
 
   @IsOptional()
-  @IsInt()
+  @Type(() => Number)
+  @IsNumber()
   @Min(0)
   budget?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(2)
   @Max(100)
-  max_members?: number;
+  maxMembers?: number;
 
   @IsOptional()
   @IsString()

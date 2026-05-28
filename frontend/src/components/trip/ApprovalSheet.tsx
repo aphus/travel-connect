@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Check, X, Star, Loader2 } from "lucide-react";
 import {
     Sheet,
@@ -9,59 +10,69 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+    approveTripJoinRequest,
+    getTripJoinRequests,
+    rejectTripJoinRequest,
+    type TripJoinRequest,
+} from "@/services/trips";
 
-// Dữ liệu mẫu (Sẽ được thay thế bằng dữ liệu fetch từ GET API khi load trang)
-const DUMMY_REQUESTS = [
-    { id: "req_1", name: "Nguyễn Tuấn Anh", trustScore: 4.8, avatar: "TA" },
-    { id: "req_2", name: "Trần Thị Bích", trustScore: 3.5, avatar: "TB" },
-];
+type ApprovalSheetProps = {
+    tripId: string;
+    onChanged?: () => void;
+    children: React.ReactNode;
+};
 
-export default function ApprovalSheet({ children }: { children: React.ReactNode }) {
-    const [requests, setRequests] = useState(DUMMY_REQUESTS);
-
-    // State để khóa nút bấm của riêng user đang được xử lý, tránh spam click
+export default function ApprovalSheet({ tripId, onChanged, children }: ApprovalSheetProps) {
+    const [requests, setRequests] = useState<TripJoinRequest[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [error, setError] = useState("");
 
-    // HÀM CHUẨN BỊ SẴN CHO BACKEND
-    const handleAction = async (id: string, action: "APPROVE" | "REJECT") => {
-        setProcessingId(id); // Bật loading cho user này
+    const loadRequests = useCallback(async () => {
+        setIsLoading(true);
+        setError("");
 
         try {
-            /* ==========================================
-               PHẦN 1: GỌI API THỰC TẾ (ĐANG COMMENT)
-               (Chỉ cần mở ra và sửa URL khi Backend hoàn thiện)
-            ========================================== */
-            // const response = await fetch(`/api/trips/requests/${id}`, {
-            //   method: "POST", // Hoặc PATCH tùy thiết kế API
-            //   headers: { "Content-Type": "application/json" },
-            //   body: JSON.stringify({ action: action }),
-            // });
-
-            // if (!response.ok) {
-            //   throw new Error("Xử lý thất bại từ server");
-            // }
-
-            /* ==========================================
-               PHẦN 2: GIẢ LẬP FRONTEND (Sẽ xóa khi dùng API thật)
-            ========================================== */
-            // Tạo độ trễ 800ms để test hiệu ứng UI khi chờ Backend phản hồi
-            await new Promise((resolve) => setTimeout(resolve, 800));
-
-            // Cập nhật giao diện: Xóa người dùng khỏi danh sách chờ sau khi thành công
-            setRequests((prev) => prev.filter((req) => req.id !== id));
-
-        } catch (error) {
-            console.error("Lỗi khi xử lý yêu cầu:", error);
-            // Có thể thêm thư viện Toast (ví dụ: sonner, react-hot-toast) để báo lỗi đỏ ở đây
+            setRequests(await getTripJoinRequests(tripId));
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Không thể tải yêu cầu tham gia.");
         } finally {
-            setProcessingId(null); // Tắt loading
+            setIsLoading(false);
+        }
+    }, [tripId]);
+
+    useEffect(() => {
+        if (isOpen) {
+            void loadRequests();
+        }
+    }, [isOpen, loadRequests]);
+
+    const handleAction = async (id: string, action: "APPROVE" | "REJECT") => {
+        setProcessingId(id);
+        setError("");
+
+        try {
+            if (action === "APPROVE") {
+                await approveTripJoinRequest(tripId, id);
+            } else {
+                await rejectTripJoinRequest(tripId, id);
+            }
+
+            setRequests((prev) => prev.filter((req) => req.id !== id));
+            onChanged?.();
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Xử lý yêu cầu thất bại.");
+        } finally {
+            setProcessingId(null);
         }
     };
 
     return (
-        <Sheet>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
                 {children}
             </SheetTrigger>
@@ -72,33 +83,52 @@ export default function ApprovalSheet({ children }: { children: React.ReactNode 
                 </SheetHeader>
 
                 <div className="flex flex-col gap-3">
-                    {requests.length === 0 ? (
+                    {error && (
+                        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                            {error}
+                        </div>
+                    )}
+
+                    {isLoading ? (
+                        <div className="flex justify-center py-10">
+                            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                        </div>
+                    ) : requests.length === 0 ? (
                         <div className="text-center text-slate-500 py-10 bg-white rounded-2xl border border-slate-100 border-dashed font-medium">
-                            Đã xử lý hết tất cả yêu cầu!
+                            Chưa có yêu cầu tham gia nào đang chờ.
                         </div>
                     ) : (
                         requests.map((req) => {
-                            // Kiểm tra xem item này có đang bị xử lý không
                             const isProcessing = processingId === req.id;
+                            const initials = getInitials(req.user.fullName);
 
                             return (
                                 <div key={req.id} className="flex items-center justify-between p-3.5 border border-slate-200/60 rounded-2xl shadow-sm bg-white hover:shadow-md transition-all">
 
-                                    <div className="flex items-center gap-3.5">
+                                    <Link
+                                        href={`/profile/${req.user.id}`}
+                                        className="flex min-w-0 items-center gap-3.5 rounded-xl pr-2 transition-colors hover:bg-slate-50"
+                                        title={`Xem trang cá nhân của ${req.user.fullName}`}
+                                    >
                                         <Avatar className="h-11 w-11">
-                                            <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">{req.avatar}</AvatarFallback>
+                                            <AvatarImage src={req.user.avatarUrl ?? undefined} />
+                                            <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">{initials}</AvatarFallback>
                                         </Avatar>
                                         <div>
-                                            <h4 className="font-bold text-slate-900 text-sm">{req.name}</h4>
+                                            <h4 className="font-bold text-slate-900 text-sm">{req.user.fullName}</h4>
                                             <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-500 mt-1">
                                                 <Star className="h-3.5 w-3.5 fill-amber-500" />
-                                                <span>{req.trustScore}</span>
+                                                <span>{req.user.trustScore}</span>
                                                 <span className="text-slate-400 font-medium">Trust Score</span>
                                             </div>
+                                            {req.message && (
+                                                <p className="mt-1 max-w-[190px] text-xs text-slate-500 line-clamp-2">
+                                                    {req.message}
+                                                </p>
+                                            )}
                                         </div>
-                                    </div>
+                                    </Link>
 
-                                    {/* CỤM NÚT HÀNH ĐỘNG CÓ LOADING */}
                                     <div className="flex gap-2">
                                         <Button
                                             onClick={() => handleAction(req.id, "REJECT")}
@@ -128,4 +158,11 @@ export default function ApprovalSheet({ children }: { children: React.ReactNode 
             </SheetContent>
         </Sheet>
     );
+}
+
+function getInitials(name: string) {
+    const words = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+    if (words.length === 0) return "TC";
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return words.map((word) => word[0]).join("").toUpperCase();
 }

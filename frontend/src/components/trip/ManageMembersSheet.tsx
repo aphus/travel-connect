@@ -1,47 +1,55 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Star, UserMinus, ShieldAlert, Users, Loader2 } from "lucide-react";
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import KickMemberAction from "./KickMemberAction";
+import { getTripMembers, type TripMember } from "@/services/trips";
 
-// GIẢ LẬP DỮ LIỆU
-const MOCK_MEMBERS = [
-    { id: "m1", name: "Đình Thạch", trustScore: 4.9, avatar: "ĐT", role: "LEADER" },
-    { id: "m2", name: "Trần Thị Bích", trustScore: 3.5, avatar: "TB", role: "MEMBER" },
-    { id: "m3", name: "Lê Văn Cường", trustScore: 4.2, avatar: "LC", role: "MEMBER" },
-];
+type ManageMembersSheetProps = {
+    tripId: string;
+    isLeader?: boolean;
+    onChanged?: () => void;
+    children: React.ReactNode;
+};
 
-export default function ManageMembersSheet({ tripId, isLeader = false, children }: { tripId: string, isLeader?: boolean, children: React.ReactNode }) {
-    const [members, setMembers] = useState(MOCK_MEMBERS);
+export default function ManageMembersSheet({ tripId, isLeader = false, onChanged, children }: ManageMembersSheetProps) {
+    const [members, setMembers] = useState<TripMember[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState("");
 
-    /* ==========================================
-       CHUẨN BỊ CHO BACKEND: FETCH DANH SÁCH THÀNH VIÊN
-    ========================================== */
-    useEffect(() => {
-        // Hàm này sẽ tự động chạy mỗi khi Leader bấm mở Sheet của chuyến đi này
-        const fetchMembers = async () => {
-            // setIsLoading(true);
-            // try {
-            //   const response = await fetch(`/api/trips/${tripId}/members`);
-            //   const data = await response.json();
-            //   setMembers(data);
-            // } catch (error) {
-            //   console.error("Lỗi fetch thành viên", error);
-            // } finally {
-            //   setIsLoading(false);
-            // }
-        };
-        fetchMembers();
+    const loadMembers = useCallback(async () => {
+        setIsLoading(true);
+        setError("");
+
+        try {
+            setMembers(await getTripMembers(tripId));
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Không thể tải thành viên.");
+        } finally {
+            setIsLoading(false);
+        }
     }, [tripId]);
 
+    useEffect(() => {
+        if (isOpen) {
+            void loadMembers();
+        }
+    }, [isOpen, loadMembers]);
+
+    const handleMemberRemoved = (memberUserId: string) => {
+        setMembers((prev) => prev.filter((member) => member.userId !== memberUserId));
+        onChanged?.();
+    };
+
     return (
-        <Sheet>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
                 {children}
             </SheetTrigger>
@@ -54,17 +62,32 @@ export default function ManageMembersSheet({ tripId, isLeader = false, children 
                     </SheetTitle>
                 </SheetHeader>
 
+                {error && (
+                    <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                        {error}
+                    </div>
+                )}
+
                 {isLoading ? (
                     <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {members.map((member) => (
+                        {members.length === 0 ? (
+                            <div className="text-center text-slate-500 py-10 bg-white rounded-2xl border border-slate-100 border-dashed font-medium">
+                                Chưa có thành viên nào.
+                            </div>
+                        ) : members.map((member) => (
                             <div key={member.id} className="flex items-center justify-between p-3.5 border border-slate-200/60 rounded-2xl shadow-sm bg-white hover:shadow-md transition-all">
 
-                                <div className="flex items-center gap-3.5">
+                                <Link
+                                    href={`/profile/${member.userId}`}
+                                    className="flex min-w-0 items-center gap-3.5 rounded-xl pr-2 transition-colors hover:bg-slate-50"
+                                    title={`Xem trang cá nhân của ${member.name}`}
+                                >
                                     <Avatar className="h-11 w-11">
+                                        <AvatarImage src={member.avatarUrl ?? undefined} />
                                         <AvatarFallback className={`${member.role === 'LEADER' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'} font-bold`}>
-                                            {member.avatar}
+                                            {getInitials(member.name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
@@ -82,14 +105,14 @@ export default function ManageMembersSheet({ tripId, isLeader = false, children 
                                             <span className="text-slate-400 font-medium">Trust Score</span>
                                         </div>
                                     </div>
-                                </div>
+                                </Link>
 
                                 {isLeader && member.role !== "LEADER" && (
                                     <KickMemberAction
                                         tripId={tripId}
-                                        memberId={member.id}
+                                        memberId={member.userId}
                                         memberName={member.name}
-                                        onSuccess={() => setMembers(prev => prev.filter(m => m.id !== member.id))}
+                                        onSuccess={() => handleMemberRemoved(member.userId)}
                                     >
                                         <Button variant="outline" size="icon" title="Xóa khỏi nhóm" className="h-9 w-9 rounded-full text-red-500 border-red-100 bg-red-50 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm">
                                             <UserMinus className="h-4 w-4" />
@@ -104,4 +127,11 @@ export default function ManageMembersSheet({ tripId, isLeader = false, children 
             </SheetContent>
         </Sheet>
     );
+}
+
+function getInitials(name: string) {
+    const words = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+    if (words.length === 0) return "TC";
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return words.map((word) => word[0]).join("").toUpperCase();
 }

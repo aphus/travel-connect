@@ -35,6 +35,7 @@ export class AuthService {
         avatarUrl: user.avatar_url,
         role: user.role,
         trustScore: Number(user.trust_score),
+        tripsCreated: user.tripsCreated,
       },
     };
   }

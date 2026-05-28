@@ -92,8 +92,8 @@ export class ReviewsService {
         trip: {
           id: true,
           destination: true,
-          start_date: true,
-          end_date: true,
+          startDate: true,
+          endDate: true,
         },
       },
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, AlertTriangle, Loader2, Flag } from "lucide-react";
 import {
     AlertDialog,
@@ -14,6 +14,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { completeTrip } from "@/services/trips";
 
 export type TripCompletionStatus = "ONGOING" | "AWAITING_CONFIRMATION" | "COMPLETED";
 
@@ -21,26 +22,34 @@ interface TripCompletionActionProps {
     tripId: string;
     initialStatus: TripCompletionStatus;
     isLeader: boolean; // Dùng để xác định góc nhìn hiển thị
+    onCompleted?: () => void;
 }
 
-export default function TripCompletionAction({ tripId, initialStatus, isLeader }: TripCompletionActionProps) {
+export default function TripCompletionAction({ tripId, initialStatus, isLeader, onCompleted }: TripCompletionActionProps) {
     const [status, setStatus] = useState<TripCompletionStatus>(initialStatus);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        setStatus(initialStatus);
+    }, [initialStatus]);
 
     // HÀM DÀNH CHO LEADER
     const handleLeaderComplete = async () => {
         setIsProcessing(true);
+        setError("");
 
-        /* ==========================================
-           BÀN GIAO BACKEND: GỌI API LEADER MARK COMPLETE (UC-08a)
-           await fetch(`/api/trips/${tripId}/complete`, { method: "POST" });
-        ========================================== */
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Giả lập độ trễ
-
-        setStatus("AWAITING_CONFIRMATION");
-        setIsProcessing(false);
-        setIsOpen(false);
+        try {
+            await completeTrip(tripId);
+            setStatus("COMPLETED");
+            setIsOpen(false);
+            onCompleted?.();
+        } catch (completeError) {
+            setError(completeError instanceof Error ? completeError.message : "Không thể hoàn thành chuyến đi.");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     // HÀM DÀNH CHO MEMBER
@@ -78,8 +87,13 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader }
                             Xác nhận chuyến đi đã kết thúc?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Hệ thống sẽ gửi yêu cầu xác nhận đến các thành viên. Sau khi có ít nhất 1 người xác nhận, chuyến đi sẽ chính thức kết thúc và mở khóa tính năng đánh giá (Trust Score).
+                            Sau khi xác nhận, chuyến đi sẽ chuyển sang trạng thái hoàn thành và mở khóa tính năng đánh giá thành viên.
                         </AlertDialogDescription>
+                        {error && (
+                            <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                                {error}
+                            </p>
+                        )}
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isProcessing}>Hủy</AlertDialogCancel>

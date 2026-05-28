@@ -1,44 +1,97 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Compass, PlusCircle, Search, MapPin, Calendar, DollarSign, Users } from "lucide-react";
+import { PlusCircle, Search, MapPin, DollarSign, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-
-// MOCK DATA: Chuyến đi nổi bật để hiển thị trên Trang chủ
-const FEATURED_TRIPS = [
-  { id: '1', title: 'Khám phá Đà Lạt 3N2Đ: Săn mây và cắm trại', location: 'Đà Lạt', startDate: '25/06/2026', currentMembers: 3, maxMembers: 6, imageUrl: 'https://images.unsplash.com/photo-1559586616-361e18714958?auto=format&fit=crop&q=80&w=800' },
-  { id: '2', title: 'Trekking Tà Năng - Phan Dũng: Cung đường đẹp nhất VN', location: 'Lâm Đồng', startDate: '02/07/2026', currentMembers: 8, maxMembers: 8, imageUrl: 'https://images.unsplash.com/photo-1583248352195-d3a8e766edf2?auto=format&fit=crop&q=80&w=800' },
-  { id: '3', title: 'Phượt xe máy Hà Giang - Sông Nho Quế', location: 'Hà Giang', startDate: '10/08/2026', currentMembers: 2, maxMembers: 10, imageUrl: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&q=80&w=800' },
-];
+import TripCard from "@/components/trip/TripCard";
+import {
+  formatCurrencyInput,
+  getTomorrowDateInputValue,
+  normalizePositiveIntegerInput,
+  parseCurrencyInput,
+  parsePositiveIntegerInput,
+} from "@/lib/trip-format";
+import { listTrips, tripToCardData, type Trip } from "@/services/trips";
 
 export default function MegaHomePage() {
   const router = useRouter();
 
-  // Khởi tạo state để lưu trữ dữ liệu tìm kiếm
   const [location, setLocation] = useState("");
   const [startDate, setStartDate] = useState("");
   const [budget, setBudget] = useState("");
   const [members, setMembers] = useState("");
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoadingTrips, setIsLoadingTrips] = useState(true);
+  const [tripsError, setTripsError] = useState("");
+  const [searchError, setSearchError] = useState("");
+  const minTripDate = getTomorrowDateInputValue();
 
-  // Hàm xử lý khi ấn Tìm kiếm ngay
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadTrips() {
+      setIsLoadingTrips(true);
+      setTripsError("");
+
+      try {
+        const result = await listTrips();
+        if (isActive) setTrips(result);
+      } catch (error) {
+        if (!isActive) return;
+
+        setTripsError(
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách chuyến đi.",
+        );
+      } finally {
+        if (isActive) setIsLoadingTrips(false);
+      }
+    }
+
+    void loadTrips();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setSearchError("");
 
-    // Gắn dữ liệu vào query string
+    const parsedBudget = parseCurrencyInput(budget);
+    const parsedMembers = parsePositiveIntegerInput(members);
+
+    if (startDate && startDate < minTripDate) {
+      setSearchError("Ngày khởi hành phải từ ngày mai trở đi.");
+      return;
+    }
+
+    if (budget && (!parsedBudget || parsedBudget <= 0)) {
+      setSearchError("Ngân sách phải lớn hơn 0.");
+      return;
+    }
+
+    if (members && (!parsedMembers || parsedMembers <= 0)) {
+      setSearchError("Số lượng thành viên phải lớn hơn 0.");
+      return;
+    }
+
     const params = new URLSearchParams();
-    if (location) params.set("location", location);
-    if (startDate) params.set("date", startDate);
-    if (budget) params.set("budget", budget);
-    if (members) params.set("members", members);
+    if (location.trim()) params.set("destination", location.trim());
+    if (startDate) params.set("startDate", startDate);
+    if (parsedBudget) params.set("budget", String(parsedBudget));
+    if (parsedMembers) params.set("maxMembers", String(parsedMembers));
 
-    // Điều hướng người dùng sang trang Feed cùng với kết quả lọc
-    router.push(`/feed?${params.toString()}`);
+    const query = params.toString();
+    router.push(query ? `/feed?${query}` : "/feed");
   };
+
+  const cardTrips = trips.map(tripToCardData);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-12 font-sans">
@@ -102,6 +155,7 @@ export default function MegaHomePage() {
               <label className="text-xs font-bold text-slate-500 uppercase">Ngày khởi hành</label>
               <Input
                 type="date"
+                min={minTripDate}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="h-12 bg-white border border-slate-200 focus-visible:ring-rose-500 text-slate-600"
@@ -114,11 +168,13 @@ export default function MegaHomePage() {
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
+                  inputMode="numeric"
                   value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
+                  onChange={(e) => setBudget(formatCurrencyInput(e.target.value))}
                   placeholder="Mức chi phí"
-                  className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
+                  className="pl-9 pr-14 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
                 />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">VNĐ</span>
               </div>
             </div>
 
@@ -128,9 +184,11 @@ export default function MegaHomePage() {
               <div className="relative">
                 <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={members}
-                  onChange={(e) => setMembers(e.target.value)}
+                  onChange={(e) => setMembers(normalizePositiveIntegerInput(e.target.value))}
                   placeholder="Số người tối đa"
                   className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500"
                 />
@@ -138,6 +196,12 @@ export default function MegaHomePage() {
             </div>
 
           </div>
+
+          {searchError && (
+            <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+              {searchError}
+            </p>
+          )}
 
           {/* NÚT TÌM KIẾM ĐẶT RIÊNG BIỆT PHÍA DƯỚI */}
           <div className="mt-6">
@@ -149,47 +213,37 @@ export default function MegaHomePage() {
         </form>
       </div>
 
-      {/* 3. BẢNG TIN CHUYẾN ĐI (FEED RÚT GỌN) */}
+      {/* 3. BẢNG TIN CHUYẾN ĐI */}
       <div className="container mx-auto px-4 mt-16 max-w-6xl">
         <div className="flex justify-between items-end mb-8 border-b pb-4 border-slate-200">
           <div>
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Chuyến đi nổi bật</h2>
-            <p className="text-slate-500 mt-1">Những hành trình đang được quan tâm nhất tuần này.</p>
+            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Chuyến đi chưa bắt đầu</h2>
+            <p className="text-slate-500 mt-1">Các hành trình đang mở từ database TripConnect.</p>
           </div>
           <Link href="/feed" className="text-blue-600 font-bold hover:underline hidden sm:block">
             Xem tất cả &rarr;
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {FEATURED_TRIPS.map((trip) => (
-            <Link key={trip.id} href={`/trips/${trip.id}`} className="group h-full cursor-pointer">
-              <Card className="h-full overflow-hidden border-slate-200 hover:shadow-xl transition-all duration-300 group-hover:-translate-y-1 bg-white">
-                <div className="relative h-56 w-full overflow-hidden">
-                  <img src={trip.imageUrl} alt={trip.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
-                  <Badge className="absolute top-4 right-4 bg-white/90 text-slate-900 font-bold shadow-sm border-none backdrop-blur-sm px-3 py-1">
-                    {trip.location}
-                  </Badge>
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900 mb-4 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
-                    {trip.title}
-                  </h3>
-                  <div className="space-y-3 text-sm text-slate-600 font-medium">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-blue-500" />
-                      <span>{trip.startDate}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Users className="w-4 h-4 text-orange-500" />
-                      <span>{trip.currentMembers} / {trip.maxMembers} thành viên</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        {tripsError && (
+          <div className="mb-8 rounded-xl border border-red-100 bg-red-50 px-5 py-4 text-sm font-semibold text-red-600">
+            {tripsError}
+          </div>
+        )}
+
+        {isLoadingTrips ? (
+          <div className="py-16 text-center text-slate-500">Đang tải chuyến đi...</div>
+        ) : cardTrips.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {cardTrips.map((trip) => (
+              <TripCard key={trip.id} trip={trip} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center font-medium text-slate-500">
+            Hiện chưa có chuyến đi nào chưa bắt đầu.
+          </div>
+        )}
 
         {/* Nút xem thêm cho Mobile */}
         <div className="mt-8 text-center sm:hidden">

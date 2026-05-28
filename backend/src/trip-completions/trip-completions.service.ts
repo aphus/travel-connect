@@ -24,7 +24,7 @@ export class TripCompletionsService {
       throw new NotFoundException('Trip not found');
     }
 
-    if (trip.leader_id === memberId) {
+    if (trip.leaderId === memberId) {
       throw new BadRequestException('Leader cannot confirm their own trip completion as a member');
     }
 
