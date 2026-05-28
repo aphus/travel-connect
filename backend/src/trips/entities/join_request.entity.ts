@@ -19,32 +19,32 @@ export enum RequestStatus {
 })
 export class JoinRequest {
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'user_id' })
-    user: User;
+    user!: User;
 
     @ManyToOne(() => Trip, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'trip_id' })
-    trip: Trip;
+    trip!: Trip;
 
     @Column({ type: 'text', nullable: true })
-    message: string;
+    message!: string | null;
 
     @Column({ type: 'enum', enum: RequestStatus, default: RequestStatus.PENDING })
-    status: RequestStatus;
+    status!: RequestStatus;
 
     @ManyToOne(() => User, { nullable: true })
     @JoinColumn({ name: 'processed_by' })
-    processedBy: User;
+    processedBy!: User | null;
 
     @Column({ type: 'timestamp', nullable: true })
-    processed_at: Date;
+    processed_at!: Date | null;
 
     @CreateDateColumn()
-    created_at: Date;
+    created_at!: Date;
 
     @UpdateDateColumn()
-    updated_at: Date;
+    updated_at!: Date;
 }

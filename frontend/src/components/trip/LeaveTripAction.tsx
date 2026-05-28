@@ -13,30 +13,29 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cancelOwnJoinRequest, leaveTrip } from "@/services/trips";
 
-export default function LeaveTripAction({ tripId, status, children }: { tripId: string, status: "PENDING" | "APPROVED", children: React.ReactNode }) {
+export default function LeaveTripAction({ tripId, status, onSuccess, children }: { tripId: string, status: "PENDING" | "APPROVED", onSuccess?: () => void, children: React.ReactNode }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [error, setError] = useState("");
 
     const handleAction = async (e: React.MouseEvent) => {
         e.preventDefault();
         setIsProcessing(true);
+        setError("");
 
         try {
-            /* ==========================================
-               GỌI API BACKEND (UC-06 Tự rời nhóm)
-            ========================================== */
-            // const endpoint = status === "PENDING" ? `/api/requests/${tripId}/cancel` : `/api/trips/${tripId}/leave`;
-            // const response = await fetch(endpoint, { method: "POST" });
-            // if (!response.ok) throw new Error("Thao tác thất bại");
+            if (status === "PENDING") {
+                await cancelOwnJoinRequest(tripId);
+            } else {
+                await leaveTrip(tripId);
+            }
 
-            /* GIẢ LẬP FRONTEND (Xóa khi có API) */
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            console.log(`Đã ${status === "PENDING" ? "hủy yêu cầu" : "rời nhóm"}: ${tripId}`);
             setIsOpen(false);
+            onSuccess?.();
         } catch (error) {
-            console.error("Lỗi:", error);
+            setError(error instanceof Error ? error.message : "Không thể xử lý thao tác.");
         } finally {
             setIsProcessing(false);
         }
@@ -57,6 +56,11 @@ export default function LeaveTripAction({ tripId, status, children }: { tripId: 
                             ? "Đơn của bạn sẽ bị hủy bỏ và Leader sẽ không nhìn thấy yêu cầu của bạn nữa."
                             : "Bạn sẽ không thể xem nội dung Chat và phải xin Leader duyệt lại nếu muốn quay lại."}
                     </AlertDialogDescription>
+                    {error && (
+                        <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                            {error}
+                        </p>
+                    )}
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isProcessing}>Quay lại</AlertDialogCancel>

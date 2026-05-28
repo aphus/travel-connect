@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Compass, UserCircle, LayoutList, LogOut, Menu, LogIn, MessageCircle, Bell } from "lucide-react";
+import { Compass, UserCircle, LayoutList, LogOut, Menu, LogIn, MessageCircle, Bell, CheckCheck } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -16,13 +16,47 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { clearAccessToken, getAccessToken } from "@/services/fetchWrapper";
 import { getCurrentUser, getStoredAuthUser, storeAuthUser, type AuthUser } from "@/services/auth";
 import { getUserInitials } from "@/lib/user";
+import {
+    getNotifications,
+    getUnreadNotificationCount,
+    markAllNotificationsRead,
+    markNotificationRead,
+    type Notification,
+} from "@/services/notifications";
 
 
 export default function SmartHeader() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+
+    const loadNotifications = useCallback(async () => {
+        if (!getAccessToken()) {
+            setNotifications([]);
+            setUnreadCount(0);
+            return;
+        }
+
+        setIsNotificationsLoading(true);
+
+        try {
+            const [items, count] = await Promise.all([
+                getNotifications(),
+                getUnreadNotificationCount(),
+            ]);
+            setNotifications(items);
+            setUnreadCount(count);
+        } catch {
+            setNotifications([]);
+            setUnreadCount(0);
+        } finally {
+            setIsNotificationsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -34,11 +68,14 @@ export default function SmartHeader() {
             if (!token) {
                 setIsLoggedIn(false);
                 setCurrentUser(null);
+                setNotifications([]);
+                setUnreadCount(0);
                 return;
             }
 
             setIsLoggedIn(true);
             if (storedUser) setCurrentUser(storedUser);
+            void loadNotifications();
 
             try {
                 const freshUser = await getCurrentUser();
@@ -52,6 +89,8 @@ export default function SmartHeader() {
                 clearAccessToken();
                 setIsLoggedIn(false);
                 setCurrentUser(null);
+                setNotifications([]);
+                setUnreadCount(0);
             }
         };
 
@@ -66,12 +105,43 @@ export default function SmartHeader() {
             window.removeEventListener("auth-token-changed", syncAuthState);
             window.removeEventListener("auth-user-changed", syncAuthState);
         };
-    }, []);
+    }, [loadNotifications]);
+
+    const handleNotificationClick = async (notification: Notification) => {
+        if (!notification.readAt) {
+            setUnreadCount((count) => Math.max(0, count - 1));
+            setNotifications((prev) =>
+                prev.map((item) =>
+                    item.id === notification.id
+                        ? { ...item, readAt: new Date().toISOString() }
+                        : item,
+                ),
+            );
+            await markNotificationRead(notification.id).catch(() => null);
+        }
+
+        if (notification.targetUrl) {
+            router.push(notification.targetUrl);
+        }
+    };
+
+    const handleMarkAllNotificationsRead = async () => {
+        setUnreadCount(0);
+        setNotifications((prev) =>
+            prev.map((notification) => ({
+                ...notification,
+                readAt: notification.readAt ?? new Date().toISOString(),
+            })),
+        );
+        await markAllNotificationsRead().catch(() => null);
+    };
 
     const handleLogout = () => {
         clearAccessToken();
         setIsLoggedIn(false);
         setCurrentUser(null);
+        setNotifications([]);
+        setUnreadCount(0);
         router.push("/login");
     };
 
@@ -129,14 +199,72 @@ export default function SmartHeader() {
                                 </button>
                             </Link>
 
-                            {/* 2. NÚT THÔNG BÁO (Tuỳ chọn thêm để Header cân đối hơn) */}
-                            <button
-                                className={`relative p-2 rounded-full transition-all hover:scale-105 hidden sm:block ${isTransparentHeader ? "text-white hover:bg-white/20" : "text-slate-600 hover:bg-slate-100"
-                                    }`}
-                                title="Thông báo"
-                            >
-                                <Bell className="h-6 w-6" />
-                            </button>
+                            <DropdownMenu onOpenChange={(open) => open && void loadNotifications()}>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        className={`relative p-2 rounded-full transition-all hover:scale-105 hidden sm:block ${isTransparentHeader ? "text-white hover:bg-white/20" : "text-slate-600 hover:bg-slate-100"
+                                            }`}
+                                        title="Thông báo"
+                                    >
+                                        <Bell className="h-6 w-6" />
+                                        {unreadCount > 0 && (
+                                            <span className="absolute -right-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">
+                                                {unreadCount > 9 ? "9+" : unreadCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="mt-4 w-96 rounded-2xl border-slate-100 bg-white p-2 shadow-xl">
+                                    <div className="flex items-center justify-between px-3 py-2">
+                                        <DropdownMenuLabel className="p-0 text-sm font-black text-slate-900">
+                                            Thông báo
+                                        </DropdownMenuLabel>
+                                        {unreadCount > 0 && (
+                                            <button
+                                                onClick={handleMarkAllNotificationsRead}
+                                                className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50"
+                                            >
+                                                <CheckCheck className="h-3.5 w-3.5" />
+                                                Đã đọc
+                                            </button>
+                                        )}
+                                    </div>
+                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                    {isNotificationsLoading ? (
+                                        <div className="px-4 py-8 text-center text-sm font-semibold text-slate-500">
+                                            Đang tải thông báo...
+                                        </div>
+                                    ) : notifications.length === 0 ? (
+                                        <div className="px-4 py-8 text-center text-sm font-semibold text-slate-500">
+                                            Chưa có thông báo mới.
+                                        </div>
+                                    ) : (
+                                        notifications.map((notification) => (
+                                            <DropdownMenuItem
+                                                key={notification.id}
+                                                onSelect={(event) => {
+                                                    event.preventDefault();
+                                                    void handleNotificationClick(notification);
+                                                }}
+                                                className="cursor-pointer items-start gap-3 rounded-xl px-3 py-3 focus:bg-slate-50"
+                                            >
+                                                <span className={`mt-1 h-2.5 w-2.5 rounded-full ${notification.readAt ? "bg-slate-200" : "bg-blue-500"}`} />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate text-sm font-extrabold text-slate-900">
+                                                        {notification.title}
+                                                    </span>
+                                                    <span className="mt-0.5 line-clamp-2 block text-xs font-medium leading-5 text-slate-500">
+                                                        {notification.message}
+                                                    </span>
+                                                    <span className="mt-1 block text-[11px] font-bold text-slate-400">
+                                                        {formatNotificationTime(notification.createdAt)}
+                                                    </span>
+                                                </span>
+                                            </DropdownMenuItem>
+                                        ))
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -163,16 +291,16 @@ export default function SmartHeader() {
                                         )}
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                    <Link href="/profile">
-                                        <DropdownMenuItem className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl hover:bg-slate-50">
+                                    <DropdownMenuItem asChild className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl hover:bg-slate-50">
+                                        <Link href="/profile">
                                             <UserCircle className="h-4 w-4 text-slate-500" /> Hồ sơ cá nhân
-                                        </DropdownMenuItem>
-                                    </Link>
-                                    <Link href="/trips/manage">
-                                        <DropdownMenuItem className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl hover:bg-slate-50">
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl hover:bg-slate-50">
+                                        <Link href="/trips/manage">
                                             <LayoutList className="h-4 w-4 text-slate-500" /> Quản lý chuyến đi
-                                        </DropdownMenuItem>
-                                    </Link>
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-slate-100" />
                                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl text-red-600 focus:text-red-600 focus:bg-red-50">
                                         <LogOut className="h-4 w-4" /> Đăng xuất
@@ -203,4 +331,18 @@ export default function SmartHeader() {
             </div>
         </header >
     );
+}
+
+function formatNotificationTime(value: string) {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    return new Intl.DateTimeFormat("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+    }).format(date);
 }

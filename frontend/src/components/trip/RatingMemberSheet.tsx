@@ -1,36 +1,52 @@
 "use client";
 
-import React, { useState } from "react";
-// Đổi từ Sheet sang Dialog để hiện popup ở giữa
+import React, { useCallback, useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { Flag } from "lucide-react";
-
-// Import sẵn api wrapper (Đang comment để chờ nối Backend)
-// import api from "@/services/api";
-
-interface Member {
-    id: string;
-    name: string;
-    avatar: string;
-    trustScore: number;
-}
+import { getStoredAuthUser } from "@/services/auth";
+import { createReview } from "@/services/reviews";
+import { getTripMembers, type TripMember } from "@/services/trips";
 
 interface RatingMemberProps {
     children: React.ReactNode;
     tripId: string;
-    members: Member[];
 }
 
-export default function RatingMemberSheet({ children, tripId, members }: RatingMemberProps) {
-    // Quản lý state đánh giá cho từng thành viên
+export default function RatingMemberSheet({ children, tripId }: RatingMemberProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [members, setMembers] = useState<TripMember[]>([]);
+    const [isLoadingMembers, setIsLoadingMembers] = useState(false);
     const [ratings, setRatings] = useState<Record<string, number>>({});
     const [comments, setComments] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
+    const [submittedIds, setSubmittedIds] = useState<Record<string, boolean>>({});
+    const [error, setError] = useState("");
+
+    const loadMembers = useCallback(async () => {
+        const currentUser = getStoredAuthUser();
+        setIsLoadingMembers(true);
+        setError("");
+
+        try {
+            const result = await getTripMembers(tripId);
+            setMembers(result.filter((member) => member.userId !== currentUser?.id));
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Không thể tải danh sách thành viên.");
+        } finally {
+            setIsLoadingMembers(false);
+        }
+    }, [tripId]);
+
+    useEffect(() => {
+        if (isOpen) {
+            void loadMembers();
+        }
+    }, [isOpen, loadMembers]);
 
     const handleRatingChange = (memberId: string, star: number) => {
         setRatings((prev) => ({ ...prev, [memberId]: star }));
@@ -41,49 +57,34 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
     };
 
     const handleSubmitRating = async (memberId: string) => {
-        const score = ratings[memberId] || 0;
+        const rating = ratings[memberId] || 0;
         const comment = comments[memberId] || "";
 
-        if (score === 0) {
-            alert("Vui lòng chọn số sao trước khi gửi đánh giá!");
+        if (rating === 0) {
+            setError("Vui lòng chọn số sao trước khi gửi đánh giá.");
             return;
         }
 
-        /* ==========================================
-           LOGIC KẾT NỐI BACKEND ĐÃ CHUẨN BỊ SẴN
-           ========================================== */
-
-        // setIsSubmitting((prev) => ({ ...prev, [memberId]: true }));
-        // try {
-        //     // Gọi API POST gửi đánh giá
-        //     const response = await api.post(`/trips/${tripId}/ratings`, {
-        //         targetUserId: memberId,
-        //         score: score,
-        //         comment: comment
-        //     });
-        //     
-        //     if (response.status === 201 || response.status === 200) {
-        //         alert("Gửi đánh giá thành công!");
-        //         // Có thể thêm logic ẩn form của user này đi sau khi đánh giá xong
-        //     }
-        // } catch (error) {
-        //     console.error("Lỗi khi gửi đánh giá:", error);
-        //     alert("Có lỗi xảy ra, vui lòng thử lại sau!");
-        // } finally {
-        //     setIsSubmitting((prev) => ({ ...prev, [memberId]: false }));
-        // }
-
-
-        // Giả lập UI lúc chưa có Backend
+        setError("");
         setIsSubmitting((prev) => ({ ...prev, [memberId]: true }));
-        setTimeout(() => {
-            alert(`Đã gửi đánh giá ${score} sao cho thành viên ${memberId}`);
+
+        try {
+            await createReview({
+                tripId,
+                revieweeId: memberId,
+                rating,
+                comment,
+            });
+            setSubmittedIds((prev) => ({ ...prev, [memberId]: true }));
+        } catch (submitError) {
+            setError(submitError instanceof Error ? submitError.message : "Không thể gửi đánh giá.");
+        } finally {
             setIsSubmitting((prev) => ({ ...prev, [memberId]: false }));
-        }, 800);
+        }
     };
 
     return (
-        <Dialog>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 {children}
             </DialogTrigger>
@@ -93,11 +94,26 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
                 </DialogHeader>
 
                 <div className="space-y-6 mt-4">
-                    {members.map((member) => (
+                    {error && (
+                        <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                            {error}
+                        </p>
+                    )}
+
+                    {isLoadingMembers ? (
+                        <div className="flex justify-center py-10 text-slate-500">
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Đang tải thành viên...
+                        </div>
+                    ) : members.length === 0 ? (
+                        <div className="rounded-xl border border-slate-100 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-500">
+                            Chưa có thành viên khác để đánh giá.
+                        </div>
+                    ) : members.map((member) => (
                         <div key={member.id} className="relative p-4 border rounded-xl shadow-sm bg-white">
 
                             <div className="absolute top-4 right-4">
-                                <ReportUserDialog targetUserId={member.id} targetUserName={member.name}>
+                                <ReportUserDialog targetUserId={member.userId} targetUserName={member.name}>
                                     <button
                                         className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
                                         title="Báo cáo vi phạm"
@@ -109,7 +125,7 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
 
                             <div className="flex items-center gap-3 mb-4">
                                 <Avatar>
-                                    <AvatarImage src={member.avatar} />
+                                    <AvatarImage src={member.avatarUrl ?? undefined} />
                                     <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">
                                         {member.name.substring(0, 2).toUpperCase()}
                                     </AvatarFallback>
@@ -125,11 +141,11 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
                                 {[1, 2, 3, 4, 5].map((star) => (
                                     <Star
                                         key={star}
-                                        className={`w-6 h-6 cursor-pointer transition-colors ${(ratings[member.id] || 0) >= star
+                                        className={`w-6 h-6 cursor-pointer transition-colors ${(ratings[member.userId] || 0) >= star
                                             ? "fill-amber-400 text-amber-400"
                                             : "text-slate-300"
                                             }`}
-                                        onClick={() => handleRatingChange(member.id, star)}
+                                        onClick={() => handleRatingChange(member.userId, star)}
                                     />
                                 ))}
                             </div>
@@ -137,16 +153,21 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
                             <Textarea
                                 placeholder="Nhận xét về thành viên này (tùy chọn)..."
                                 className="mb-3 resize-none"
-                                value={comments[member.id] || ""}
-                                onChange={(e) => handleCommentChange(member.id, e.target.value)}
+                                value={comments[member.userId] || ""}
+                                onChange={(e) => handleCommentChange(member.userId, e.target.value)}
+                                disabled={submittedIds[member.userId]}
                             />
 
                             <Button
                                 className="w-full bg-slate-900 hover:bg-slate-800"
-                                onClick={() => handleSubmitRating(member.id)}
-                                disabled={isSubmitting[member.id]}
+                                onClick={() => handleSubmitRating(member.userId)}
+                                disabled={isSubmitting[member.userId] || submittedIds[member.userId]}
                             >
-                                {isSubmitting[member.id] ? "Đang gửi..." : "Gửi đánh giá"}
+                                {submittedIds[member.userId]
+                                    ? "Đã gửi đánh giá"
+                                    : isSubmitting[member.userId]
+                                        ? "Đang gửi..."
+                                        : "Gửi đánh giá"}
                             </Button>
                         </div>
                     ))}

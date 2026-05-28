@@ -30,6 +30,7 @@ export class AdminService {
         'role',
         'is_banned',
         'trust_score',
+        'tripsCreated',
         'created_at',
       ],
     });
@@ -37,7 +38,7 @@ export class AdminService {
 
   listTrips() {
     return this.tripsRepository.find({
-      order: { created_at: 'DESC' },
+      order: { createdAt: 'DESC' },
     });
   }
 

@@ -13,6 +13,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { removeTripMember } from "@/services/trips";
 
 interface KickMemberActionProps {
     tripId: string;
@@ -25,29 +26,19 @@ interface KickMemberActionProps {
 export default function KickMemberAction({ tripId, memberId, memberName, onSuccess, children }: KickMemberActionProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [error, setError] = useState("");
 
     const handleKick = async (e: React.MouseEvent) => {
         e.preventDefault();
         setIsProcessing(true);
+        setError("");
 
         try {
-            /* ==========================================
-               GỌI API BACKEND (UC-06: Kick thành viên)
-            ========================================== */
-            // const response = await fetch(`/api/trips/${tripId}/members/${memberId}/kick`, {
-            //   method: "POST", // Hoặc DELETE
-            // });
-            // if (!response.ok) throw new Error("Kick thất bại");
-
-            /* GIẢ LẬP FRONTEND */
-            await new Promise((resolve) => setTimeout(resolve, 800));
-
-            console.log(`Đã kick thành viên ${memberName} khỏi chuyến đi ${tripId}`);
-            // TODO: Kích hoạt fetch lại danh sách thành viên hoặc xóa khỏi state
+            await removeTripMember(tripId, memberId);
             setIsOpen(false);
             if (onSuccess) onSuccess();
         } catch (error) {
-            console.error("Lỗi:", error);
+            setError(error instanceof Error ? error.message : "Không thể xóa thành viên.");
         } finally {
             setIsProcessing(false);
         }
@@ -64,6 +55,11 @@ export default function KickMemberAction({ tripId, memberId, memberName, onSucce
                     <AlertDialogDescription>
                         Người này sẽ bị đưa ra khỏi nhóm Chat và không thể tham gia chuyến đi nữa. Bạn có chắc chắn muốn thực hiện hành động này?
                     </AlertDialogDescription>
+                    {error && (
+                        <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                            {error}
+                        </p>
+                    )}
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isProcessing}>Hủy</AlertDialogCancel>

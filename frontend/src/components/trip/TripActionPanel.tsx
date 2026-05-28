@@ -1,31 +1,30 @@
 // components/trip/TripActionPanel.tsx
 "use client";
+import Link from "next/link";
 import TripCompletionAction from "./TripCompletionAction";
 import JoinTripButton from "./JoinTripButton";
 import RatingMemberSheet from "./RatingMemberSheet";
 import ManageMembersSheet from "./ManageMembersSheet";
 import LeaveTripAction from "./LeaveTripAction";
+import ApprovalSheet from "./ApprovalSheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReportUserDialog from "@/components/report/ReportUserDialog";
-import { Flag, LogOut } from "lucide-react";
+import { Flag, LogOut, Users } from "lucide-react";
+import type { JoinStatus } from "@/services/trips";
 
 interface TripActionPanelProps {
     trip: any;
     isLeader: boolean;
     isMember: boolean;
+    joinStatus?: JoinStatus | null;
+    onChanged?: () => void;
 }
 
-export default function TripActionPanel({ trip, isLeader, isMember }: TripActionPanelProps) {
+export default function TripActionPanel({ trip, isLeader, isMember, joinStatus, onChanged }: TripActionPanelProps) {
     // Đảm bảo có giá trị mặc định tránh lỗi undefined
     const status = trip?.status || "UPCOMING";
     const leader = trip?.leader || { name: "Đang cập nhật", trustScore: 0, avatar: "" };
-
-    // Giả lập danh sách thành viên
-    const members = [
-        { id: "m2", name: "Trần Thị Bích", avatar: "TB", trustScore: 95 },
-        { id: "m3", name: "Lê Văn Cường", avatar: "LC", trustScore: 88 },
-    ];
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
@@ -51,7 +50,7 @@ export default function TripActionPanel({ trip, isLeader, isMember }: TripAction
                 {/* BỌC NÚT BẤM VÀO TRONG REPORT DIALOG */}
                 {/* (Tạm để targetUserId là "leader-1" để test) */}
                 {isMember && (
-                    <ReportUserDialog targetUserId="leader-1" targetUserName={leader.name}>
+                    <ReportUserDialog targetUserId={leader.id} targetUserName={leader.name}>
                         <button
                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all absolute right-0 top-0"
                             title="Báo cáo vi phạm"
@@ -64,8 +63,44 @@ export default function TripActionPanel({ trip, isLeader, isMember }: TripAction
 
             <div className="space-y-3">
                 {/* 1. Dành cho LEADER */}
+                {isLeader && status === "UPCOMING" && (
+                    <div className="space-y-3">
+                        <Link href={`/trips/manage?tab=created&tripId=${trip.id}`}>
+                            <Button className="w-full bg-orange-500 hover:bg-orange-600 font-bold">
+                                Quản lý chuyến đi
+                            </Button>
+                        </Link>
+                        <ApprovalSheet tripId={trip.id} onChanged={onChanged}>
+                            <Button
+                                variant="outline"
+                                className="w-full border-orange-200 text-orange-700 hover:bg-orange-50 font-bold"
+                                disabled={!trip.pendingRequests}
+                            >
+                                Duyệt đơn ({trip.pendingRequests ?? 0})
+                            </Button>
+                        </ApprovalSheet>
+                        <ManageMembersSheet tripId={trip.id} isLeader onChanged={onChanged}>
+                            <Button variant="outline" className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 font-bold">
+                                <Users className="mr-2 h-4 w-4" />
+                                Danh sách thành viên
+                            </Button>
+                        </ManageMembersSheet>
+                        <TripCompletionAction
+                            tripId={trip.id}
+                            initialStatus="ONGOING"
+                            isLeader={true}
+                            onCompleted={onChanged}
+                        />
+                    </div>
+                )}
+
                 {isLeader && status === "ONGOING" && (
-                    <TripCompletionAction tripId={trip.id} initialStatus="ONGOING" isLeader={true} />
+                    <TripCompletionAction
+                        tripId={trip.id}
+                        initialStatus="ONGOING"
+                        isLeader={true}
+                        onCompleted={onChanged}
+                    />
                 )}
 
                 {/* 2. Dành cho MEMBER */}
@@ -83,7 +118,7 @@ export default function TripActionPanel({ trip, isLeader, isMember }: TripAction
 
                         {/* BỔ SUNG: Nút Xem thành viên và Rời nhóm (Chỉ hiện khi chưa hoàn thành) */}
                         {status === "UPCOMING" && (
-                            <LeaveTripAction tripId={trip.id} status="APPROVED">
+                            <LeaveTripAction tripId={trip.id} status="APPROVED" onSuccess={onChanged}>
                                 <Button variant="outline" className="w-full flex items-center justify-center text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
                                     <LogOut className="w-4 h-4 mr-2" /> Rời khỏi chuyến đi
                                 </Button>
@@ -95,7 +130,7 @@ export default function TripActionPanel({ trip, isLeader, isMember }: TripAction
                 {/* 3. Dành cho GUEST (Chưa tham gia) */}
                 {!isLeader && !isMember && (
                     status === "UPCOMING" ? (
-                        <JoinTripButton tripId={trip.id} initialStatus="NONE" />
+                        <JoinTripButton tripId={trip.id} initialStatus={joinStatus ?? "NONE"} onSuccess={onChanged} />
                     ) : (
                         <div className="p-3 bg-slate-50 rounded-lg text-center font-medium text-slate-500 text-sm">
                             {status === "ONGOING" ? "Chuyến đi đang diễn ra" : "Không thể tham gia"}
@@ -110,7 +145,7 @@ export default function TripActionPanel({ trip, isLeader, isMember }: TripAction
                             Chuyến đi đã kết thúc
                         </div>
                         {(isLeader || isMember) && (
-                            <RatingMemberSheet tripId={trip.id} members={members}>
+                            <RatingMemberSheet tripId={trip.id}>
                                 <Button className="w-full bg-blue-600 hover:bg-blue-700">
                                     Đánh giá thành viên
                                 </Button>

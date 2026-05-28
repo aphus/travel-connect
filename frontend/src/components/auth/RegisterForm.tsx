@@ -22,7 +22,7 @@ export default function RegisterForm() {
 
         const redirectIfAuthenticated = async () => {
             if (await validateStoredToken()) {
-                if (isMounted) router.replace("/feed");
+                if (isMounted) router.replace("/");
             }
         };
 
@@ -54,7 +54,7 @@ export default function RegisterForm() {
             storeAuthUser(response.user);
             setAccessToken(response.accessToken);
             setAuthFlash(`Tạo tài khoản thành công. Xin chào ${response.user.fullName}!`);
-            router.replace("/feed");
+            router.replace("/");
             router.refresh();
         } catch (error) {
             setErrorMessage(getAuthErrorMessage(error));

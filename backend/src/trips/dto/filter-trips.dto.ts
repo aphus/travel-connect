@@ -1,4 +1,12 @@
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { TripStatus } from '../entities/trip.entity';
 
@@ -9,29 +17,23 @@ export class FilterTripsDto {
 
   @IsOptional()
   @IsDateString()
-  start_date?: string;
+  startDate?: string;
 
   @IsOptional()
   @IsDateString()
-  end_date?: string;
+  endDate?: string;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsNumber()
   @Min(0)
-  min_budget?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  max_budget?: number;
+  budget?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  min_members?: number;
+  maxMembers?: number;
 
   @IsOptional()
   @IsEnum(TripStatus)

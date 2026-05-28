@@ -37,6 +37,9 @@ export class User {
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
   trust_score!: number;
 
+  @Column({ name: 'trips_created', type: 'int', default: 0 })
+  tripsCreated!: number;
+
   @CreateDateColumn()
   created_at!: Date;
 
