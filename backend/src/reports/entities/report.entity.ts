@@ -19,6 +19,7 @@ export enum ReportReason {
 export enum ReportStatus {
   PENDING = 'pending',
   RESOLVED = 'resolved',
+  REJECTED = 'rejected',
 }
 
 @Entity('reports')
@@ -47,14 +48,17 @@ export class Report {
   @JoinColumn({ name: 'reported_id' })
   reported!: User;
 
-  @Column({ type: 'enum', enum: ReportReason })
-  reason!: ReportReason;
+  @Column({ type: 'varchar', length: 100 })
+  reason!: string;
 
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
   @Column({ type: 'enum', enum: ReportStatus, default: ReportStatus.PENDING })
   status!: ReportStatus;
+
+  @Column({ type: 'text', nullable: true })
+  admin_note!: string | null;
 
   @CreateDateColumn()
   created_at!: Date;
