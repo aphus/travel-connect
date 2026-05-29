@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-// Đổi từ Sheet sang Dialog để hiện popup ở giữa
+import axios from "axios";
+import api from "@/services/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,9 +10,6 @@ import { Star } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { Flag } from "lucide-react";
-
-// Import sẵn api wrapper (Đang comment để chờ nối Backend)
-// import api from "@/services/api";
 
 interface Member {
     id: string;
@@ -26,11 +24,31 @@ interface RatingMemberProps {
     members: Member[];
 }
 
+function getReviewErrorMessage(error: unknown) {
+    if (!axios.isAxiosError(error)) {
+        return "Có lỗi xảy ra, vui lòng thử lại sau!";
+    }
+
+    switch (error.response?.status) {
+        case 400:
+            return "Không thể gửi đánh giá: chuyến đi chưa hoàn thành hoặc bạn đang tự đánh giá chính mình.";
+        case 401:
+            return "Bạn cần đăng nhập để gửi đánh giá.";
+        case 403:
+            return "Chỉ thành viên đang tham gia chuyến đi mới có thể đánh giá nhau.";
+        case 409:
+            return "Bạn đã đánh giá thành viên này trong chuyến đi này rồi.";
+        default:
+            return "Có lỗi xảy ra, vui lòng thử lại sau!";
+    }
+}
+
 export default function RatingMemberSheet({ children, tripId, members }: RatingMemberProps) {
     // Quản lý state đánh giá cho từng thành viên
     const [ratings, setRatings] = useState<Record<string, number>>({});
     const [comments, setComments] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
+    const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
 
     const handleRatingChange = (memberId: string, star: number) => {
         setRatings((prev) => ({ ...prev, [memberId]: star }));
@@ -49,37 +67,28 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
             return;
         }
 
-        /* ==========================================
-           LOGIC KẾT NỐI BACKEND ĐÃ CHUẨN BỊ SẴN
-           ========================================== */
-
-        // setIsSubmitting((prev) => ({ ...prev, [memberId]: true }));
-        // try {
-        //     // Gọi API POST gửi đánh giá
-        //     const response = await api.post(`/trips/${tripId}/ratings`, {
-        //         targetUserId: memberId,
-        //         score: score,
-        //         comment: comment
-        //     });
-        //     
-        //     if (response.status === 201 || response.status === 200) {
-        //         alert("Gửi đánh giá thành công!");
-        //         // Có thể thêm logic ẩn form của user này đi sau khi đánh giá xong
-        //     }
-        // } catch (error) {
-        //     console.error("Lỗi khi gửi đánh giá:", error);
-        //     alert("Có lỗi xảy ra, vui lòng thử lại sau!");
-        // } finally {
-        //     setIsSubmitting((prev) => ({ ...prev, [memberId]: false }));
-        // }
-
-
-        // Giả lập UI lúc chưa có Backend
         setIsSubmitting((prev) => ({ ...prev, [memberId]: true }));
-        setTimeout(() => {
-            alert(`Đã gửi đánh giá ${score} sao cho thành viên ${memberId}`);
+        setSubmitErrors((prev) => ({ ...prev, [memberId]: "" }));
+
+        try {
+            await api.post("/reviews", {
+                trip_id: tripId,
+                reviewee_id: memberId,
+                rating: score,
+                comment: comment.trim() || undefined,
+            });
+
+            alert("Gửi đánh giá thành công!");
+            setRatings((prev) => ({ ...prev, [memberId]: 0 }));
+            setComments((prev) => ({ ...prev, [memberId]: "" }));
+        } catch (error) {
+            const message = getReviewErrorMessage(error);
+            console.error("Lỗi khi gửi đánh giá:", error);
+            setSubmitErrors((prev) => ({ ...prev, [memberId]: message }));
+            alert(message);
+        } finally {
             setIsSubmitting((prev) => ({ ...prev, [memberId]: false }));
-        }, 800);
+        }
     };
 
     return (
@@ -148,6 +157,10 @@ export default function RatingMemberSheet({ children, tripId, members }: RatingM
                             >
                                 {isSubmitting[member.id] ? "Đang gửi..." : "Gửi đánh giá"}
                             </Button>
+
+                            {submitErrors[member.id] && (
+                                <p className="mt-2 text-sm text-red-600">{submitErrors[member.id]}</p>
+                            )}
                         </div>
                     ))}
                 </div>

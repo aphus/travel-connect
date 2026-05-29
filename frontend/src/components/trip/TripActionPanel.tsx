@@ -18,14 +18,32 @@ interface TripActionPanelProps {
 
 export default function TripActionPanel({ trip, isLeader, isMember }: TripActionPanelProps) {
     // Đảm bảo có giá trị mặc định tránh lỗi undefined
-    const status = trip?.status || "UPCOMING";
-    const leader = trip?.leader || { name: "Đang cập nhật", trustScore: 0, avatar: "" };
+    const status = String(trip?.status || "UPCOMING").toUpperCase();
+    const rawLeader = trip?.leader || {};
+    const leader = {
+        id: rawLeader.id || trip?.leader_id || "leader-1",
+        name: rawLeader.name || rawLeader.full_name || "Đang cập nhật",
+        trustScore: rawLeader.trustScore ?? rawLeader.trust_score ?? 0,
+        avatar: rawLeader.avatar || rawLeader.avatar_url || "",
+    };
 
-    // Giả lập danh sách thành viên
-    const members = [
-        { id: "m2", name: "Trần Thị Bích", avatar: "TB", trustScore: 95 },
-        { id: "m3", name: "Lê Văn Cường", avatar: "LC", trustScore: 88 },
-    ];
+    const rawMembers = Array.isArray(trip?.members)
+        ? trip.members
+        : Array.isArray(trip?.trip_members)
+            ? trip.trip_members
+            : [];
+    const members = rawMembers
+        .map((member: any) => {
+            const user = member.user || member;
+
+            return {
+                id: user.id || member.user_id,
+                name: user.name || user.full_name || "Thành viên",
+                avatar: user.avatar || user.avatar_url || "",
+                trustScore: user.trustScore ?? user.trust_score ?? 0,
+            };
+        })
+        .filter((member: any) => Boolean(member.id));
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
@@ -51,7 +69,7 @@ export default function TripActionPanel({ trip, isLeader, isMember }: TripAction
                 {/* BỌC NÚT BẤM VÀO TRONG REPORT DIALOG */}
                 {/* (Tạm để targetUserId là "leader-1" để test) */}
                 {isMember && (
-                    <ReportUserDialog targetUserId="leader-1" targetUserName={leader.name}>
+                    <ReportUserDialog targetUserId={leader.id} targetUserName={leader.name}>
                         <button
                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all absolute right-0 top-0"
                             title="Báo cáo vi phạm"

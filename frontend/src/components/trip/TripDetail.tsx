@@ -45,12 +45,13 @@ export default function TripDetail({ tripId, tripData }: { tripId: string, tripD
                 <TripActionPanel
                     trip={{
                         ...tripData,
-                        status: "UPCOMING", // Ép trạng thái thành Đang diễn ra
-                        leader: {
+                        id: tripData.id || tripId,
+                        status: tripData.status || "UPCOMING",
+                        leader: tripData.leader || {
                             name: "Đình Thạch",
                             trustScore: 99,
                             avatar: ""
-                        }
+                        },
                     }}
                     isLeader={isLeader}
                     isMember={isMember}
