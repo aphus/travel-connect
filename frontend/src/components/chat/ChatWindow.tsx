@@ -91,9 +91,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Giả lập lấy tên phòng chat dựa trên tripId
-  const roomTitle =
-    tripId === "4" ? "Trekking Tà Năng - Phan Dũng" : "Phòng chat nhóm";
+  const roomTitle = "Phòng chat nhóm";
 
   useEffect(() => {
     let isMounted = true;
