@@ -1,14 +1,16 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Review } from './entities/review.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { Trip, TripStatus } from '../trips/entities/trip.entity';
+import { MemberStatus, TripMember } from '../trips/entities/trip-member.entity';
 import { User } from '../users/entities/user.entity';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class ReviewsService {
     private readonly reviewsRepository: Repository<Review>,
     @InjectRepository(Trip)
     private readonly tripsRepository: Repository<Trip>,
+    @InjectRepository(TripMember)
+    private readonly tripMembersRepository: Repository<TripMember>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
   ) {}
@@ -45,7 +49,17 @@ export class ReviewsService {
       throw new NotFoundException('Reviewee not found');
     }
 
-    // TODO: After TripMembers module is merged, validate reviewer and reviewee are active members of this trip.
+    await this.ensureActiveTripMember(
+      dto.trip_id,
+      reviewerId,
+      'Only active trip members can create reviews',
+    );
+    await this.ensureActiveTripMember(
+      dto.trip_id,
+      dto.reviewee_id,
+      'Reviewee must be an active trip member',
+    );
+
     const existing = await this.reviewsRepository.findOne({
       where: {
         trip_id: dto.trip_id,
@@ -65,7 +79,7 @@ export class ReviewsService {
       comment: dto.comment?.trim() || null,
     });
 
-    const savedReview = await this.reviewsRepository.save(review);
+    const savedReview = await this.saveReview(review);
     await this.recalculateTrustScore(dto.reviewee_id);
 
     return savedReview;
@@ -137,5 +151,37 @@ export class ReviewsService {
     const trustScore = Number(average.toFixed(2));
 
     await this.usersRepository.update(userId, { trust_score: trustScore });
+  }
+
+  private async ensureActiveTripMember(
+    tripId: string,
+    userId: string,
+    message: string,
+  ) {
+    const membership = await this.tripMembersRepository.findOne({
+      where: {
+        trip: { id: tripId },
+        user: { id: userId },
+        status: MemberStatus.ACTIVE,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException(message);
+    }
+  }
+
+  private async saveReview(review: Review) {
+    try {
+      return await this.reviewsRepository.save(review);
+    } catch (error) {
+      if (error instanceof QueryFailedError && error.driverError?.code === '23505') {
+        throw new ConflictException(
+          'This user has already been reviewed by you for this trip',
+        );
+      }
+
+      throw error;
+    }
   }
 }
