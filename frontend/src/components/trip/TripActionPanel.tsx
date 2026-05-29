@@ -135,6 +135,13 @@ export default function TripActionPanel({
     status === "UPCOMING" || status === "ONGOING" || status === "IN_PROGRESS";
   const canRate = status === "COMPLETED";
 
+  const completionInitialStatus =
+    status === "AWAITING_CONFIRMATION"
+      ? "AWAITING_CONFIRMATION"
+      : status === "COMPLETED"
+        ? "COMPLETED"
+        : "ONGOING";
+
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
       <h3 className="font-bold text-slate-900 mb-4">Người dẫn đoàn</h3>
@@ -236,7 +243,7 @@ export default function TripActionPanel({
         {isLeader && canLeaderComplete && (
           <TripCompletionAction
             tripId={trip.id}
-            initialStatus={status}
+            initialStatus={completionInitialStatus}
             isLeader={true}
             onCompleted={onChanged}
           />
@@ -273,7 +280,7 @@ export default function TripActionPanel({
             {status === "AWAITING_CONFIRMATION" && (
               <TripCompletionAction
                 tripId={trip.id}
-                initialStatus={status}
+                initialStatus="AWAITING_CONFIRMATION"
                 isLeader={false}
                 onCompleted={onChanged}
               />

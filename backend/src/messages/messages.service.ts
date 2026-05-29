@@ -9,7 +9,7 @@ import { Repository } from 'typeorm';
 import { Message } from './entities/message.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Trip } from '../trips/entities/trip.entity';
-import { MemberStatus, TripMember } from '../trips/entities/trip-member.entity';
+import { TripMember } from '../trips/entities/trip_member.entity';
 
 @Injectable()
 export class MessagesService {
@@ -88,7 +88,6 @@ export class MessagesService {
       where: {
         trip: { id: tripId },
         user: { id: userId },
-        status: MemberStatus.ACTIVE,
       },
     });
 

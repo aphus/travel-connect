@@ -10,7 +10,7 @@ import { TripsModule } from './trips/trips.module';
 import { AdminModule } from './admin/admin.module';
 import { MessagesModule } from './messages/messages.module';
 import { ReviewsModule } from './reviews/reviews.module';
-import { TripCompletionsModule } from './trip-completions/trip-completions.module';
+import { TripCompletionsModule } from './trip-completions/trip_completions.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';

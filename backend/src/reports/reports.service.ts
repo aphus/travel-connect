@@ -9,11 +9,7 @@ import { Repository } from 'typeorm';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ResolveReportDto } from './dto/resolve-report.dto';
 import { Report, ReportStatus } from './entities/report.entity';
-import {
-  MemberRole,
-  MemberStatus,
-  TripMember,
-} from '../trips/entities/trip-member.entity';
+import { MemberRole, TripMember } from '../trips/entities/trip_member.entity';
 import { Trip } from '../trips/entities/trip.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 
@@ -96,11 +92,10 @@ export class ReportsService {
           trip: { id: tripId },
           user: { id: user.sub },
           role: MemberRole.LEADER,
-          status: MemberStatus.ACTIVE,
         },
       });
 
-      if (!leaderMembership && trip.leader_id !== user.sub) {
+      if (!leaderMembership && trip.leaderId !== user.sub) {
         throw new ForbiddenException(
           'Only admins or trip leaders can view trip reports',
         );
@@ -138,7 +133,6 @@ export class ReportsService {
       where: {
         trip: { id: tripId },
         user: { id: userId },
-        status: MemberStatus.ACTIVE,
       },
     });
 
@@ -190,10 +184,10 @@ export class ReportsService {
     },
     trip: {
       id: true,
-      leader_id: true,
+      leaderId: true,
       destination: true,
-      start_date: true,
-      end_date: true,
+      startDate: true,
+      endDate: true,
       status: true,
     },
   };

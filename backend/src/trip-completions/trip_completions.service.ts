@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { TripCompletionConfirmation } from './entities/trip-completion-confirmation.entity';
 import { Trip, TripStatus } from '../trips/entities/trip.entity';
-import { MemberStatus, TripMember } from '../trips/entities/trip-member.entity';
+import { TripMember } from '../trips/entities/trip_member.entity';
 
 @Injectable()
 export class TripCompletionsService {
@@ -29,29 +29,36 @@ export class TripCompletionsService {
     }
 
     if (trip.leaderId === memberId) {
-      throw new BadRequestException('Leader cannot confirm their own trip completion as a member');
+      throw new BadRequestException(
+        'Leader cannot confirm their own trip completion as a member',
+      );
     }
 
     const existing = await this.confirmationsRepository.findOne({
       where: { trip_id: tripId, member_id: memberId },
     });
     if (existing) {
-      throw new ConflictException('This member has already confirmed this trip completion');
+      throw new ConflictException(
+        'This member has already confirmed this trip completion',
+      );
     }
 
     if (trip.status !== TripStatus.AWAITING_CONFIRMATION) {
-      throw new BadRequestException('Trip completion can only be confirmed while awaiting confirmation');
+      throw new BadRequestException(
+        'Trip completion can only be confirmed while awaiting confirmation',
+      );
     }
 
     const activeMembership = await this.tripMembersRepository.findOne({
       where: {
         trip: { id: tripId },
         user: { id: memberId },
-        status: MemberStatus.ACTIVE,
       },
     });
     if (!activeMembership) {
-      throw new ForbiddenException('Only active trip members can confirm trip completion');
+      throw new ForbiddenException(
+        'Only active trip members can confirm trip completion',
+      );
     }
 
     const confirmation = this.confirmationsRepository.create({
@@ -65,7 +72,9 @@ export class TripCompletionsService {
     });
 
     if (confirmationCount >= 1) {
-      await this.tripsRepository.update(tripId, { status: TripStatus.COMPLETED });
+      await this.tripsRepository.update(tripId, {
+        status: TripStatus.COMPLETED,
+      });
     }
 
     const updatedTrip = await this.tripsRepository.findOneOrFail({
@@ -102,8 +111,13 @@ export class TripCompletionsService {
     try {
       return await this.confirmationsRepository.save(confirmation);
     } catch (error) {
-      if (error instanceof QueryFailedError && error.driverError?.code === '23505') {
-        throw new ConflictException('This member has already confirmed this trip completion');
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError?.code === '23505'
+      ) {
+        throw new ConflictException(
+          'This member has already confirmed this trip completion',
+        );
       }
 
       throw error;

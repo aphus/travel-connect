@@ -50,7 +50,9 @@ export class TripsService {
 
   private validateTripDates(startDate: string, endDate: string) {
     if (startDate > endDate) {
-      throw new BadRequestException('Ngày kết thúc phải sau hoặc bằng ngày khởi hành');
+      throw new BadRequestException(
+        'Ngày kết thúc phải sau hoặc bằng ngày khởi hành',
+      );
     }
   }
 
@@ -230,7 +232,8 @@ export class TripsService {
       const compactDestination = this.compactSearchText(trip.destination);
       const destinationTokens = destination.split(' ');
 
-      if (destination === query || compactDestination === compactQuery) score += 120;
+      if (destination === query || compactDestination === compactQuery)
+        score += 120;
       else if (
         destination.startsWith(query) ||
         compactDestination.startsWith(compactQuery)
@@ -246,7 +249,10 @@ export class TripsService {
     }
 
     if (filters.startDate) {
-      if (trip.startDate <= filters.startDate && trip.endDate >= filters.startDate) {
+      if (
+        trip.startDate <= filters.startDate &&
+        trip.endDate >= filters.startDate
+      ) {
         score += 60;
       } else {
         const before = this.addDays(filters.startDate, -1);
@@ -263,7 +269,8 @@ export class TripsService {
     if (typeof filters.maxMembers === 'number') {
       const availableSlots = trip.maxMembers - stats.currentMembers;
       if (availableSlots >= filters.maxMembers) score += 25;
-      else if (availableSlots >= Math.max(1, filters.maxMembers - 1)) score += 15;
+      else if (availableSlots >= Math.max(1, filters.maxMembers - 1))
+        score += 15;
       else if (trip.maxMembers >= filters.maxMembers) score += 8;
     }
 
@@ -301,7 +308,9 @@ export class TripsService {
           role: MemberRole.LEADER,
         }),
       );
-      await manager.getRepository(User).increment({ id: leaderId }, 'tripsCreated', 1);
+      await manager
+        .getRepository(User)
+        .increment({ id: leaderId }, 'tripsCreated', 1);
 
       return savedTrip;
     });
@@ -331,9 +340,12 @@ export class TripsService {
       qb.andWhere(
         new Brackets((where) => {
           tokens.forEach((token, index) => {
-            where.orWhere(`${normalizedDestination} LIKE :destinationToken${index}`, {
-              [`destinationToken${index}`]: `%${token}%`,
-            });
+            where.orWhere(
+              `${normalizedDestination} LIKE :destinationToken${index}`,
+              {
+                [`destinationToken${index}`]: `%${token}%`,
+              },
+            );
           });
 
           if (compactQuery) {
@@ -384,10 +396,10 @@ export class TripsService {
     const stats = await this.loadTripStats(trips.map((trip) => trip.id));
     const hasSearchFilters = Boolean(
       filters.destination?.trim() ||
-        filters.startDate ||
-        filters.endDate ||
-        typeof filters.budget === 'number' ||
-        typeof filters.maxMembers === 'number',
+      filters.startDate ||
+      filters.endDate ||
+      typeof filters.budget === 'number' ||
+      typeof filters.maxMembers === 'number',
     );
 
     return trips
@@ -559,7 +571,9 @@ export class TripsService {
     this.assertLeader(trip, userId);
 
     if (trip.status !== TripStatus.UPCOMING) {
-      throw new BadRequestException('Chỉ có thể sửa trip ở trạng thái upcoming');
+      throw new BadRequestException(
+        'Chỉ có thể sửa trip ở trạng thái upcoming',
+      );
     }
 
     if (this.hasTripStarted(trip)) {
@@ -721,7 +735,11 @@ export class TripsService {
     }));
   }
 
-  async approveJoinRequest(tripId: string, requestId: string, leaderId: string) {
+  async approveJoinRequest(
+    tripId: string,
+    requestId: string,
+    leaderId: string,
+  ) {
     const request = await this.getPendingJoinRequestForLeader(
       tripId,
       requestId,
@@ -833,7 +851,9 @@ export class TripsService {
     const relation = await this.findRelation(tripId, userId);
 
     if (!relation.isLeader && !relation.isMember) {
-      throw new ForbiddenException('Bạn chưa phải thành viên của chuyến đi này');
+      throw new ForbiddenException(
+        'Bạn chưa phải thành viên của chuyến đi này',
+      );
     }
 
     const members = await this.dataSource
@@ -858,7 +878,9 @@ export class TripsService {
       };
     });
 
-    const hasLeader = responses.some((member) => member.userId === trip.leaderId);
+    const hasLeader = responses.some(
+      (member) => member.userId === trip.leaderId,
+    );
     if (!hasLeader && trip.leader) {
       responses.unshift({
         id: `leader-${trip.leader.id}`,
@@ -882,7 +904,9 @@ export class TripsService {
     this.assertLeader(trip, leaderId);
 
     if (memberUserId === leaderId) {
-      throw new BadRequestException('Leader không thể tự xóa mình khỏi chuyến đi');
+      throw new BadRequestException(
+        'Leader không thể tự xóa mình khỏi chuyến đi',
+      );
     }
 
     this.validateTripIsBookable(trip);
@@ -931,7 +955,9 @@ export class TripsService {
     const trip = await this.findOne(tripId);
 
     if (trip.leaderId === userId) {
-      throw new BadRequestException('Leader không thể rời chuyến đi của chính mình');
+      throw new BadRequestException(
+        'Leader không thể rời chuyến đi của chính mình',
+      );
     }
 
     this.validateTripIsBookable(trip);
@@ -1004,20 +1030,28 @@ export class TripsService {
   async markCompletedByLeader(tripId: string, userId: string) {
     const trip = await this.findOne(tripId);
 
-    if (trip.leader_id !== userId) {
-      throw new ForbiddenException('Only leader can mark this trip as completed');
+    if (trip.leaderId !== userId) {
+      throw new ForbiddenException(
+        'Only leader can mark this trip as completed',
+      );
     }
 
     if (trip.status === TripStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled trips cannot be marked completed');
+      throw new BadRequestException(
+        'Cancelled trips cannot be marked completed',
+      );
     }
 
     if (trip.status === TripStatus.COMPLETED) {
-      throw new BadRequestException('Completed trips cannot be marked completed again');
+      throw new BadRequestException(
+        'Completed trips cannot be marked completed again',
+      );
     }
 
     if (![TripStatus.UPCOMING, TripStatus.ONGOING].includes(trip.status)) {
-      throw new BadRequestException('Only upcoming or ongoing trips can be marked completed');
+      throw new BadRequestException(
+        'Only upcoming or ongoing trips can be marked completed',
+      );
     }
 
     await this.tripsRepository.update(tripId, {

@@ -10,7 +10,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { Review } from './entities/review.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { Trip, TripStatus } from '../trips/entities/trip.entity';
-import { MemberStatus, TripMember } from '../trips/entities/trip-member.entity';
+import { TripMember } from '../trips/entities/trip_member.entity';
 import { User } from '../users/entities/user.entity';
 
 @Injectable()
@@ -39,7 +39,9 @@ export class ReviewsService {
     }
 
     if (trip.status !== TripStatus.COMPLETED) {
-      throw new BadRequestException('Reviews are only allowed for completed trips');
+      throw new BadRequestException(
+        'Reviews are only allowed for completed trips',
+      );
     }
 
     const reviewee = await this.usersRepository.findOne({
@@ -68,7 +70,9 @@ export class ReviewsService {
       },
     });
     if (existing) {
-      throw new ConflictException('This user has already been reviewed by you for this trip');
+      throw new ConflictException(
+        'This user has already been reviewed by you for this trip',
+      );
     }
 
     const review = this.reviewsRepository.create({
@@ -162,7 +166,6 @@ export class ReviewsService {
       where: {
         trip: { id: tripId },
         user: { id: userId },
-        status: MemberStatus.ACTIVE,
       },
     });
 
@@ -175,7 +178,10 @@ export class ReviewsService {
     try {
       return await this.reviewsRepository.save(review);
     } catch (error) {
-      if (error instanceof QueryFailedError && error.driverError?.code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError?.code === '23505'
+      ) {
         throw new ConflictException(
           'This user has already been reviewed by you for this trip',
         );
