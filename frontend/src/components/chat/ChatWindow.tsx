@@ -15,7 +15,7 @@ import {
 import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { useSocket } from "@/contexts/SocketProvider";
 import api from "@/services/api";
-import { getAuthToken } from "@/services/authToken";
+import { getAccessToken } from "@/services/fetchWrapper";
 
 type ApiMessage = {
   id: string;
@@ -69,7 +69,7 @@ function mapApiMessage(message: ApiMessage): ChatMessage {
 }
 
 function getCurrentUserIdFromToken() {
-  const token = getAuthToken();
+  const token = getAccessToken();
   if (!token) return null;
 
   try {
@@ -106,7 +106,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
         return;
       }
 
-      const token = getAuthToken();
+      const token = getAccessToken();
 
       if (!token) {
         setCurrentUserId(null);

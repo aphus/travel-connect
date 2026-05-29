@@ -11,6 +11,12 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { Trip } from '../trips/entities/trip.entity';
 import { TripMember } from '../trips/entities/trip_member.entity';
 
+function isValidUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 @Injectable()
 export class MessagesService {
   constructor(
@@ -97,6 +103,10 @@ export class MessagesService {
   }
 
   private async ensureTripExists(tripId: string) {
+    if (!isValidUuid(tripId)) {
+      throw new BadRequestException('Invalid trip id');
+    }
+
     const trip = await this.tripsRepository.findOne({
       where: { id: tripId },
     });
