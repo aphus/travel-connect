@@ -149,4 +149,10 @@ export class TripsController {
   cancel(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     return this.tripsService.cancelByLeader(id, user.sub);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/mark-completed')
+  markCompleted(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
+    return this.tripsService.markCompletedByLeader(id, user.sub);
+  }
 }

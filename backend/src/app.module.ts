@@ -11,6 +11,8 @@ import { AdminModule } from './admin/admin.module';
 import { MessagesModule } from './messages/messages.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { TripCompletionsModule } from './trip-completions/trip-completions.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -42,6 +44,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     MessagesModule,
     ReviewsModule,
     TripCompletionsModule,
+    RealtimeModule,
+    ReportsModule,
     NotificationsModule,
   ],
   controllers: [AppController],

@@ -3,19 +3,22 @@ import React from "react";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import ChatWindow from "@/components/chat/ChatWindow";
 
-export default function ChatRoomPage({ params }: { params: { tripId: string } }) {
-    // Trích xuất tripId từ đường dẫn URL (ví dụ: /chat/4 -> tripId = "4")
-    const { tripId } = params;
+type ChatRoomPageProps = {
+  params: Promise<{
+    tripId: string;
+  }>;
+};
 
-    return (
-        <div className="flex w-full bg-white h-[calc(100vh-64px)] overflow-hidden">
-            {/* Cột trái: Danh sách phòng chat (Ẩn trên màn hình điện thoại nhỏ để tối ưu không gian) */}
-            <div className="hidden md:block">
-                <ChatSidebar activeTripId={tripId} />
-            </div>
+export default async function ChatRoomPage({ params }: ChatRoomPageProps) {
+  const { tripId } = await params;
 
-            {/* Cột phải: Khung chat chính */}
-            <ChatWindow tripId={tripId} />
-        </div>
-    );
+  return (
+    <div className="flex w-full bg-white h-[calc(100vh-64px)] overflow-hidden">
+      <div className="hidden md:block">
+        <ChatSidebar activeTripId={tripId} />
+      </div>
+
+      <ChatWindow tripId={tripId} />
+    </div>
+  );
 }
