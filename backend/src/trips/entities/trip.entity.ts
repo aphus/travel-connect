@@ -14,9 +14,13 @@ export enum TripStatus {
   UPCOMING = 'upcoming',
   ONGOING = 'ongoing',
   AWAITING_CONFIRMATION = 'awaiting_confirmation',
-  IN_PROGRESS = 'in_progress',
+  LEGACY_IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
+}
+
+export function normalizeTripStatus(status: TripStatus): TripStatus {
+  return status === TripStatus.LEGACY_IN_PROGRESS ? TripStatus.ONGOING : status;
 }
 
 const decimalToNumberTransformer: ValueTransformer = {
