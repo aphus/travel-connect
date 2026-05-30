@@ -1048,7 +1048,11 @@ export class TripsService {
       );
     }
 
-    if (![TripStatus.UPCOMING, TripStatus.ONGOING].includes(trip.status)) {
+    if (
+      ![TripStatus.UPCOMING, TripStatus.ONGOING, TripStatus.IN_PROGRESS].includes(
+        trip.status,
+      )
+    ) {
       throw new BadRequestException(
         'Only upcoming or ongoing trips can be marked completed',
       );
