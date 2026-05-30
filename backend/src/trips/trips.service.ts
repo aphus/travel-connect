@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
-import { Trip, TripStatus } from './entities/trip.entity';
+import {
+  normalizeTripStatus,
+  Trip,
+  TripStatus,
+} from './entities/trip.entity';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { FilterTripsDto } from './dto/filter-trips.dto';
@@ -121,7 +125,7 @@ export class TripsService {
       budget: trip.budget,
       maxMembers: trip.maxMembers,
       description: trip.description,
-      status: trip.status,
+      status: normalizeTripStatus(trip.status),
       leaderMarkedCompleted: trip.leaderMarkedCompleted,
       leaderId: trip.leaderId,
       createdAt: trip.createdAt,
@@ -320,12 +324,17 @@ export class TripsService {
 
   async findAll(filters: FilterTripsDto) {
     const qb = this.createPublicTripsQuery();
+    const status = normalizeTripStatus(filters.status ?? TripStatus.UPCOMING);
 
-    qb.where('trip.status = :status', {
-      status: filters.status ?? TripStatus.UPCOMING,
-    });
+    if (status === TripStatus.ONGOING) {
+      qb.where('trip.status IN (:...statuses)', {
+        statuses: [TripStatus.ONGOING, TripStatus.LEGACY_IN_PROGRESS],
+      });
+    } else {
+      qb.where('trip.status = :status', { status });
+    }
 
-    if ((filters.status ?? TripStatus.UPCOMING) === TripStatus.UPCOMING) {
+    if (status === TripStatus.UPCOMING) {
       qb.andWhere('trip.start_date > :today', {
         today: this.getTodayDateString(),
       });
@@ -1048,11 +1057,9 @@ export class TripsService {
       );
     }
 
-    if (
-      ![TripStatus.UPCOMING, TripStatus.ONGOING, TripStatus.IN_PROGRESS].includes(
-        trip.status,
-      )
-    ) {
+    const status = normalizeTripStatus(trip.status);
+
+    if (![TripStatus.UPCOMING, TripStatus.ONGOING].includes(status)) {
       throw new BadRequestException(
         'Only upcoming or ongoing trips can be marked completed',
       );
