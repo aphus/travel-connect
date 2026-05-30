@@ -9,9 +9,11 @@ import { fetchWrapper } from "./fetchWrapper";
 
 export type TripStatus =
   | "upcoming"
-  | "in_progress"
+  | "ongoing"
   | "completed"
   | "cancelled";
+
+type RawTripStatus = TripStatus | "in_progress";
 
 export type TripLeader = {
   id: string;
@@ -82,7 +84,7 @@ type RawTrip = {
   maxMembers?: number;
   max_members?: number;
   description?: string | null;
-  status?: TripStatus;
+  status?: RawTripStatus;
   pendingRequests?: number;
   pending_requests?: number;
   joinStatus?: JoinStatus;
@@ -393,7 +395,7 @@ function normalizeTrip(trip: RawTrip): Trip {
     currentMembers: Number(trip.currentMembers ?? trip.current_members ?? 1),
     maxMembers: Number(trip.maxMembers ?? trip.max_members ?? 0),
     description: trip.description ?? null,
-    status: trip.status ?? "upcoming",
+    status: normalizeTripStatus(trip.status),
     pendingRequests: Number(trip.pendingRequests ?? trip.pending_requests ?? 0),
     joinStatus: trip.joinStatus ?? trip.join_status,
     leaderId: trip.leaderId ?? trip.leader_id ?? "",
@@ -456,7 +458,12 @@ function splitTripDescription(description: string | null, destination: string) {
   };
 }
 
-function toUiStatus(status: TripStatus) {
+function normalizeTripStatus(status?: RawTripStatus): TripStatus {
+  if (status === "in_progress") return "ongoing";
+  return status ?? "upcoming";
+}
+
+function toUiStatus(status: RawTripStatus) {
   if (status === "in_progress") return "ONGOING";
   return status.toUpperCase();
 }

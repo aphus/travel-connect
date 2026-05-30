@@ -51,7 +51,7 @@ const TRIP_STATUS_META: Record<TripStatus, { label: string; className: string }>
         label: "Sắp diễn ra",
         className: "bg-indigo-100 text-indigo-700 hover:bg-indigo-200",
     },
-    in_progress: {
+    ongoing: {
         label: "Đang diễn ra",
         className: "bg-blue-100 text-blue-700 hover:bg-blue-200",
     },
@@ -68,7 +68,7 @@ const TRIP_STATUS_META: Record<TripStatus, { label: string; className: string }>
 const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilterValue; label: string }> = [
     { value: "all", label: "Tất cả trạng thái" },
     { value: "upcoming", label: TRIP_STATUS_META.upcoming.label },
-    { value: "in_progress", label: TRIP_STATUS_META.in_progress.label },
+    { value: "ongoing", label: TRIP_STATUS_META.ongoing.label },
     { value: "completed", label: TRIP_STATUS_META.completed.label },
     { value: "cancelled", label: TRIP_STATUS_META.cancelled.label },
 ];
@@ -502,7 +502,7 @@ function getTripLifecycleStatus(trip: Trip, today: string): TripStatus {
     }
 
     if (trip.startDate > today) return "upcoming";
-    return "in_progress";
+    return "ongoing";
 }
 
 function getTripDateSortValue(trip: Trip) {
