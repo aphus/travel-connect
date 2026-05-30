@@ -314,6 +314,21 @@ export async function completeTrip(tripId: string) {
   return normalizeTrip(trip);
 }
 
+export async function markTripCompleted(tripId: string) {
+  const trip = await fetchWrapper<RawTrip>(`/trips/${tripId}/mark-completed`, {
+    method: "PATCH",
+  });
+
+  return normalizeTrip(trip);
+}
+
+export async function confirmTripCompletion(tripId: string) {
+  return fetchWrapper<{ trip_status: string }>(
+    `/trips/${tripId}/completion-confirmations`,
+    { method: "POST" },
+  );
+}
+
 export function tripToCardData(trip: Trip): TripCardData {
   const { title } = splitTripDescription(trip.description, trip.destination);
 

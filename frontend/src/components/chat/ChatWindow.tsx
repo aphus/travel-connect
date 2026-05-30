@@ -16,6 +16,7 @@ import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { useSocket } from "@/contexts/SocketProvider";
 import api from "@/services/api";
 import { getAccessToken } from "@/services/fetchWrapper";
+import { getTrip } from "@/services/trips";
 
 type ApiMessage = {
   id: string;
@@ -83,15 +84,22 @@ function getCurrentUserIdFromToken() {
   }
 }
 
+function isClosedTripStatus(status: string | null) {
+  const normalizedStatus = status?.toLowerCase();
+  return normalizedStatus === "completed" || normalizedStatus === "cancelled";
+}
+
 export default function ChatWindow({ tripId }: ChatWindowProps) {
   const { socket, isConnected } = useSocket();
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [tripStatus, setTripStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   const roomTitle = "Phòng chat nhóm";
+  const isTripClosed = isClosedTripStatus(tripStatus);
 
   useEffect(() => {
     let isMounted = true;
@@ -99,6 +107,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
     async function loadMessages() {
       if (!tripId) {
         setMessages([]);
+        setTripStatus(null);
         setIsLoading(false);
         setError("Không tìm thấy mã chuyến đi.");
         return;
@@ -109,6 +118,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
       if (!token) {
         setCurrentUserId(null);
         setMessages([]);
+        setTripStatus(null);
         setIsLoading(false);
         setError("Bạn cần đăng nhập để xem tin nhắn.");
         return;
@@ -119,13 +129,15 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
       setError("");
 
       try {
-        const response = await api.get<ApiMessage[]>(
-          `/trips/${tripId}/messages`,
-        );
+        const [messagesResponse, trip] = await Promise.all([
+          api.get<ApiMessage[]>(`/trips/${tripId}/messages`),
+          getTrip(tripId).catch(() => null),
+        ]);
 
         if (!isMounted) return;
 
-        setMessages(response.data.map(mapApiMessage));
+        setMessages(messagesResponse.data.map(mapApiMessage));
+        setTripStatus(trip?.status ?? null);
       } catch {
         if (!isMounted) return;
 
@@ -172,6 +184,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
     const content = newMessage.trim();
 
     if (!content) return;
+    if (isTripClosed) return;
 
     if (!socket || !isConnected) {
       setError("Mất kết nối realtime. Vui lòng thử lại sau.");
@@ -280,46 +293,55 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
       </div>
 
       {/* Khung gõ tin nhắn */}
-      <div className="p-4 bg-white border-t border-slate-200">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-slate-400 hover:text-slate-600 hidden sm:flex"
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-slate-400 hover:text-slate-600 hidden sm:flex"
-          >
-            <ImageIcon className="w-5 h-5" />
-          </Button>
-          <div className="flex-1 relative">
-            <Input
-              placeholder="Nhập tin nhắn..."
-              className="pr-10 rounded-full bg-slate-50 border-slate-200 focus-visible:ring-blue-500"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-            />
+      {isTripClosed ? (
+        <div className="border-t border-slate-200 bg-white p-4">
+          <div className="rounded-full bg-slate-100 px-5 py-3 text-center text-sm font-medium text-slate-500">
+            Chuyến đi đã kết thúc. Bạn vẫn có thể xem lại tin nhắn nhưng không
+            thể gửi tin nhắn mới.
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-white border-t border-slate-200">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-400"
+              className="text-slate-400 hover:text-slate-600 hidden sm:flex"
             >
-              <Smile className="w-5 h-5" />
+              <Paperclip className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-slate-400 hover:text-slate-600 hidden sm:flex"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </Button>
+            <div className="flex-1 relative">
+              <Input
+                placeholder="Nhập tin nhắn..."
+                className="pr-10 rounded-full bg-slate-50 border-slate-200 focus-visible:ring-blue-500"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-400"
+              >
+                <Smile className="w-5 h-5" />
+              </Button>
+            </div>
+            <Button
+              className="rounded-full bg-blue-600 hover:bg-blue-700 h-10 w-10 p-0"
+              onClick={handleSendMessage}
+            >
+              <Send className="w-4 h-4 ml-1" />
             </Button>
           </div>
-          <Button
-            className="rounded-full bg-blue-600 hover:bg-blue-700 h-10 w-10 p-0"
-            onClick={handleSendMessage}
-          >
-            <Send className="w-4 h-4 ml-1" />
-          </Button>
         </div>
-      </div>
+      )}
     </div>
   );
 }

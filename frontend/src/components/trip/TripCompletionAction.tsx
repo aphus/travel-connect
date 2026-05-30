@@ -14,7 +14,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { completeTrip } from "@/services/trips";
+import { confirmTripCompletion, markTripCompleted } from "@/services/trips";
 
 export type TripCompletionStatus = "ONGOING" | "AWAITING_CONFIRMATION" | "COMPLETED";
 
@@ -32,7 +32,13 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader, 
     const [error, setError] = useState("");
 
     useEffect(() => {
-        setStatus(initialStatus);
+        const timeoutId = window.setTimeout(() => {
+            setStatus(initialStatus);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
     }, [initialStatus]);
 
     // HÀM DÀNH CHO LEADER
@@ -41,8 +47,8 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader, 
         setError("");
 
         try {
-            await completeTrip(tripId);
-            setStatus("COMPLETED");
+            await markTripCompleted(tripId);
+            setStatus("AWAITING_CONFIRMATION");
             setIsOpen(false);
             onCompleted?.();
         } catch (completeError) {
@@ -55,15 +61,17 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader, 
     // HÀM DÀNH CHO MEMBER
     const handleMemberConfirm = async () => {
         setIsProcessing(true);
+        setError("");
 
-        /* ==========================================
-           BÀN GIAO BACKEND: GỌI API MEMBER XÁC NHẬN (UC-08b)
-           await fetch(`/api/trips/${tripId}/confirm-completion`, { method: "POST" });
-        ========================================== */
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        setStatus("COMPLETED");
-        setIsProcessing(false);
+        try {
+            const result = await confirmTripCompletion(tripId);
+            setStatus(result.trip_status === "completed" ? "COMPLETED" : "AWAITING_CONFIRMATION");
+            onCompleted?.();
+        } catch (confirmError) {
+            setError(confirmError instanceof Error ? confirmError.message : "Không thể xác nhận hoàn thành chuyến đi.");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     /* --- RENDER GIAO DIỆN THEO TỪNG TRẠNG THÁI --- */
@@ -87,7 +95,7 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader, 
                             Xác nhận chuyến đi đã kết thúc?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Sau khi xác nhận, chuyến đi sẽ chuyển sang trạng thái hoàn thành và mở khóa tính năng đánh giá thành viên.
+                            Sau khi xác nhận, chuyến đi sẽ chuyển sang trạng thái chờ thành viên xác nhận trước khi hoàn thành.
                         </AlertDialogDescription>
                         {error && (
                             <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
@@ -140,6 +148,11 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader, 
                     {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                     {isProcessing ? "Đang xử lý..." : "Xác nhận chuyến đi kết thúc"}
                 </Button>
+                {error && (
+                    <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                        {error}
+                    </p>
+                )}
             </div>
         );
     }

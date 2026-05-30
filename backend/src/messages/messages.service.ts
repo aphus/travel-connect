@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Message } from './entities/message.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { Trip } from '../trips/entities/trip.entity';
+import { Trip, TripStatus } from '../trips/entities/trip.entity';
 import { TripMember } from '../trips/entities/trip_member.entity';
 
 function isValidUuid(value: string) {
@@ -53,7 +53,13 @@ export class MessagesService {
   }
 
   async create(tripId: string, senderId: string, dto: CreateMessageDto) {
-    await this.ensureCanAccessTrip(tripId, senderId);
+    const trip = await this.ensureCanAccessTrip(tripId, senderId);
+
+    if ([TripStatus.COMPLETED, TripStatus.CANCELLED].includes(trip.status)) {
+      throw new BadRequestException(
+        'Cannot send messages after a trip is completed or cancelled',
+      );
+    }
 
     const content = dto.content?.trim();
 
@@ -88,7 +94,7 @@ export class MessagesService {
   }
 
   async ensureCanAccessTrip(tripId: string, userId: string) {
-    await this.ensureTripExists(tripId);
+    const trip = await this.ensureTripExists(tripId);
 
     const membership = await this.tripMembersRepository.findOne({
       where: {
@@ -100,6 +106,8 @@ export class MessagesService {
     if (!membership) {
       throw new ForbiddenException('Only active trip members can access chat');
     }
+
+    return trip;
   }
 
   private async ensureTripExists(tripId: string) {
