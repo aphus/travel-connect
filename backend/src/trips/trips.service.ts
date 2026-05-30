@@ -83,6 +83,32 @@ export class TripsService {
     return trip.startDate <= this.getTodayDateString();
   }
 
+  private async syncStartedUpcomingTrips() {
+    await this.tripsRepository
+      .createQueryBuilder()
+      .update(Trip)
+      .set({ status: TripStatus.ONGOING })
+      .where('status = :status', { status: TripStatus.UPCOMING })
+      .andWhere('start_date <= :today', { today: this.getTodayDateString() })
+      .execute();
+  }
+
+  private async syncTripStatusByDate(trip: Trip) {
+    if (trip.status !== TripStatus.UPCOMING || !this.hasTripStarted(trip)) {
+      return trip;
+    }
+
+    await this.tripsRepository.update(trip.id, { status: TripStatus.ONGOING });
+    trip.status = TripStatus.ONGOING;
+
+    return trip;
+  }
+
+  private async syncTripsStatusByDate<T extends Trip>(trips: T[]) {
+    await Promise.all(trips.map((trip) => this.syncTripStatusByDate(trip)));
+    return trips;
+  }
+
   private addDays(dateValue: string, days: number) {
     const [year, month, day] = dateValue.split('-').map(Number);
     const date = new Date(Date.UTC(year, month - 1, day));
@@ -323,6 +349,8 @@ export class TripsService {
   }
 
   async findAll(filters: FilterTripsDto) {
+    await this.syncStartedUpcomingTrips();
+
     const qb = this.createPublicTripsQuery();
     const status = normalizeTripStatus(filters.status ?? TripStatus.UPCOMING);
 
@@ -441,7 +469,7 @@ export class TripsService {
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
-    return trip;
+    return this.syncTripStatusByDate(trip);
   }
 
   async findPublicOne(id: string) {
@@ -453,6 +481,8 @@ export class TripsService {
       throw new NotFoundException('Trip not found');
     }
 
+    await this.syncTripStatusByDate(trip);
+
     const stats = await this.loadTripStats([trip.id]);
     return this.toPublicTripWithStats(
       trip,
@@ -461,10 +491,13 @@ export class TripsService {
   }
 
   async findCreatedByLeader(userId: string) {
+    await this.syncStartedUpcomingTrips();
+
     const trips = await this.createPublicTripsQuery()
       .where('trip.leader_id = :userId', { userId })
       .orderBy('trip.created_at', 'DESC')
       .getMany();
+    await this.syncTripsStatusByDate(trips);
     const stats = await this.loadTripStats(trips.map((trip) => trip.id));
 
     return trips.map((trip) =>
@@ -476,6 +509,8 @@ export class TripsService {
   }
 
   async findJoinedByUser(userId: string) {
+    await this.syncStartedUpcomingTrips();
+
     const memberships = await this.dataSource
       .getRepository(TripMember)
       .createQueryBuilder('member')
@@ -485,6 +520,9 @@ export class TripsService {
       .andWhere('member.role = :role', { role: MemberRole.MEMBER })
       .orderBy('member.joined_at', 'DESC')
       .getMany();
+    await this.syncTripsStatusByDate(
+      memberships.map((membership) => membership.trip),
+    );
 
     const joinedStats = await this.loadTripStats(
       memberships.map((membership) => membership.trip.id),
@@ -512,6 +550,9 @@ export class TripsService {
       })
       .orderBy('request.created_at', 'DESC')
       .getMany();
+    await this.syncTripsStatusByDate(
+      pendingOrRejectedRequests.map((request) => request.trip),
+    );
 
     const visibleRequests = pendingOrRejectedRequests.filter(
       (request) => !joinedTripIds.has(request.trip.id),
