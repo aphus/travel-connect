@@ -77,7 +77,8 @@ type TripActionPanelProps = {
 };
 
 function normalizeStatus(status?: TripStatus) {
-  return String(status || "UPCOMING").toUpperCase();
+  const normalized = String(status || "UPCOMING").toUpperCase();
+  return normalized === "IN_PROGRESS" ? "ONGOING" : normalized;
 }
 
 function getDisplayName(user: TripUser | TripMemberLike) {
@@ -132,7 +133,7 @@ export default function TripActionPanel({
   const canJoin = status === "UPCOMING";
   const canManageBeforeTrip = status === "UPCOMING";
   const canLeaderComplete =
-    status === "UPCOMING" || status === "ONGOING" || status === "IN_PROGRESS";
+    status === "UPCOMING" || status === "ONGOING";
   const canRate = status === "COMPLETED";
 
   const completionInitialStatus =
@@ -298,7 +299,7 @@ export default function TripActionPanel({
             />
           ) : (
             <div className="p-3 bg-slate-50 rounded-lg text-center font-medium text-slate-500 text-sm">
-              {status === "ONGOING" || status === "IN_PROGRESS"
+              {status === "ONGOING"
                 ? "Chuyến đi đang diễn ra"
                 : "Không thể tham gia"}
             </div>
