@@ -11,7 +11,7 @@ import ApprovalSheet from "./ApprovalSheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReportUserDialog from "@/components/report/ReportUserDialog";
-import { Flag, LogOut, Users } from "lucide-react";
+import { Flag, LogOut, Users, Clock } from "lucide-react";
 import type { JoinStatus } from "@/services/trips";
 
 type TripStatus =
@@ -133,7 +133,7 @@ export default function TripActionPanel({
   const canJoin = status === "UPCOMING";
   const canManageBeforeTrip = status === "UPCOMING";
   const canLeaderComplete =
-    status === "UPCOMING" || status === "ONGOING";
+    status === "UPCOMING" || status === "ONGOING" || status === "AWAITING_CONFIRMATION";
   const canRate = status === "COMPLETED";
 
   const completionInitialStatus =
@@ -145,6 +145,19 @@ export default function TripActionPanel({
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-24">
+      {status === "AWAITING_CONFIRMATION" && (
+        <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 shadow-sm">
+          <h4 className="font-bold flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Đang chờ xác nhận
+          </h4>
+          <p className="text-sm mt-1">
+            {isLeader
+              ? "Hệ thống đang chờ các thành viên xác nhận hoàn thành chuyến đi."
+              : "Leader đã yêu cầu hoàn thành. Vui lòng xác nhận để kết thúc chuyến đi."}
+          </p>
+        </div>
+      )}
+
       <h3 className="font-bold text-slate-900 mb-4">Người dẫn đoàn</h3>
 
       <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 relative">
@@ -211,24 +224,30 @@ export default function TripActionPanel({
       )}
 
       <div className="space-y-3">
-        {isLeader && canManageBeforeTrip && (
+        {isLeader && (
           <div className="space-y-3">
-            <Link href={`/trips/manage?tab=created&tripId=${trip.id}`}>
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 font-bold">
-                Quản lý chuyến đi
-              </Button>
-            </Link>
+            {/* Những thứ chỉ hiện khi trip chưa diễn ra */}
+            {canManageBeforeTrip && (
+              <>
+                <Link href={`/trips/manage?tab=created&tripId=${trip.id}`}>
+                  <Button className="w-full bg-orange-500 hover:bg-orange-600 font-bold">
+                    Quản lý chuyến đi
+                  </Button>
+                </Link>
 
-            <ApprovalSheet tripId={trip.id} onChanged={onChanged}>
-              <Button
-                variant="outline"
-                className="w-full border-orange-200 text-orange-700 hover:bg-orange-50 font-bold"
-                disabled={pendingRequests <= 0}
-              >
-                Duyệt đơn ({pendingRequests})
-              </Button>
-            </ApprovalSheet>
+                <ApprovalSheet tripId={trip.id} onChanged={onChanged}>
+                  <Button
+                    variant="outline"
+                    className="w-full border-orange-200 text-orange-700 hover:bg-orange-50 font-bold"
+                    disabled={pendingRequests <= 0}
+                  >
+                    Duyệt đơn ({pendingRequests})
+                  </Button>
+                </ApprovalSheet>
+              </>
+            )}
 
+            {/* Nút Danh sách thành viên: TÁCH RA ĐỂ HIỂN THỊ MỌI TRẠNG THÁI */}
             <ManageMembersSheet tripId={trip.id} isLeader onChanged={onChanged}>
               <Button
                 variant="outline"

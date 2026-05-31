@@ -17,6 +17,8 @@ import { useSocket } from "@/contexts/SocketProvider";
 import api from "@/services/api";
 import { getAccessToken } from "@/services/fetchWrapper";
 import { getTrip } from "@/services/trips";
+import ChatMenu from "@/components/chat/ChatMenu";
+
 
 type ApiMessage = {
   id: string;
@@ -97,6 +99,16 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
   const [tripStatus, setTripStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [trip, setTrip] = useState<any>(null);
+
+  const currentUser = getCurrentUserIdFromToken();
+  const isLeader = trip?.leaderId === currentUser || trip?.leader_id === currentUser || trip?.leader?.id === currentUser;
+
+  const rawMembers = trip?.members || trip?.trip_members || [];
+  const isMember = isLeader || rawMembers.some((m: any) => {
+    const memberId = m.user?.id || m.userId || m.user_id || m.id;
+    return memberId === currentUser;
+  });
 
   const roomTitle = "Phòng chat nhóm";
   const isTripClosed = isClosedTripStatus(tripStatus);
@@ -129,7 +141,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
       setError("");
 
       try {
-        const [messagesResponse, trip] = await Promise.all([
+        const [messagesResponse, tripData] = await Promise.all([
           api.get<ApiMessage[]>(`/trips/${tripId}/messages`),
           getTrip(tripId).catch(() => null),
         ]);
@@ -137,7 +149,8 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
         if (!isMounted) return;
 
         setMessages(messagesResponse.data.map(mapApiMessage));
-        setTripStatus(trip?.status ?? null);
+        setTrip(tripData);
+        setTripStatus(tripData?.status ?? null);
       } catch {
         if (!isMounted) return;
 
@@ -211,9 +224,12 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
             <p className="text-xs text-slate-500">3 thành viên</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon">
-          <MoreVertical className="w-5 h-5 text-slate-500" />
-        </Button>
+        <ChatMenu
+          tripId={tripId}
+          leaderId={trip?.leaderId || trip?.leader_id || ""}
+          isLeader={isLeader}
+          isMember={isMember}
+        />
       </div>
 
       {/* Lịch sử tin nhắn */}

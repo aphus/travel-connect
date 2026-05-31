@@ -13,6 +13,7 @@ import {
     Navigation,
     Users,
     XCircle,
+    PlusCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -163,17 +164,22 @@ function ManageTripsContent() {
 
     return (
         <div className="min-h-screen bg-slate-50 pb-12">
-            <div className="relative w-full h-[30vh] bg-slate-900 flex items-center justify-center overflow-hidden">
+            <div className="relative w-full min-h-[36vh] pb-12 bg-slate-900 flex items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 to-transparent" />
-                <div className="relative z-10 text-center px-4">
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 drop-shadow-lg relative w-fit mx-auto">
-                        <Navigation className="h-10 w-10 text-orange-400 absolute -left-12 top-1/2 -translate-y-1/2" />
-                        Trung tâm điều hành
-                    </h1>
-                    <p className="text-lg text-slate-200 font-medium max-w-2xl mx-auto drop-shadow-md">
-                        Quản lý các hành trình bạn đã tạo và theo dõi tiến độ ghép nhóm của bạn.
-                    </p>
+                <div className="relative w-full h-[30vh] bg-slate-900 flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-50 to-transparent" />
+
+                    <div className="relative z-10 text-center px-4">
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4 drop-shadow-lg relative w-fit mx-auto">
+                            <Navigation className="h-10 w-10 text-orange-400 absolute -left-12 top-1/2 -translate-y-1/2" />
+                            Trung tâm điều hành
+                        </h1>
+                        <p className="text-lg text-slate-200 font-medium max-w-2xl mx-auto drop-shadow-md">
+                            Quản lý các hành trình bạn đã tạo và theo dõi tiến độ ghép nhóm của bạn.
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -225,6 +231,13 @@ function ManageTripsContent() {
                                     ))}
                                 </SelectContent>
                             </Select>
+
+                            <Link href="/trips/create" className="w-full sm:w-auto">
+                                <Button className="w-full sm:w-auto h-10 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-sm">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Tạo chuyến đi
+                                </Button>
+                            </Link>
                         </div>
                     )}
 
@@ -485,10 +498,10 @@ function getFilteredSortedTrips(
             return getTripLifecycleStatus(trip, today) === statusFilter;
         })
         .sort((left, right) => {
-            const dateDiff = getTripDateSortValue(right) - getTripDateSortValue(left);
+            const dateDiff = getTripDateSortValue(left) - getTripDateSortValue(right);
             if (dateDiff !== 0) return dateDiff;
 
-            return getTripCreatedSortValue(right) - getTripCreatedSortValue(left);
+            return getTripCreatedSortValue(left) - getTripCreatedSortValue(right);
         });
 }
 

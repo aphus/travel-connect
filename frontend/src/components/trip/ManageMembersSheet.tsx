@@ -10,6 +10,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import KickMemberAction from "./KickMemberAction";
 import { getTripMembers, type TripMember } from "@/services/trips";
+import ReportUserDialog from "@/components/report/ReportUserDialog";
+import { Flag } from "lucide-react";
+import { getStoredAuthUser } from "@/services/auth";
 
 type ManageMembersSheetProps = {
     tripId: string;
@@ -23,6 +26,9 @@ export default function ManageMembersSheet({ tripId, isLeader = false, onChanged
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const currentUser = getStoredAuthUser();
+    const currentUserId = currentUser?.id;
+
 
     const loadMembers = useCallback(async () => {
         setIsLoading(true);
@@ -106,6 +112,15 @@ export default function ManageMembersSheet({ tripId, isLeader = false, onChanged
                                         </div>
                                     </div>
                                 </Link>
+
+                                {/* Nút Báo cáo (Chỉ hiện nếu không phải chính mình) */}
+                                {member.userId !== currentUserId && (
+                                    <ReportUserDialog targetUserId={member.userId} targetUserName={member.name}>
+                                        <Button variant="ghost" size="sm" className="text-amber-600 hover:text-amber-700">
+                                            <Flag className="h-4 w-4" />
+                                        </Button>
+                                    </ReportUserDialog>
+                                )}
 
                                 {isLeader && member.role !== "LEADER" && (
                                     <KickMemberAction
