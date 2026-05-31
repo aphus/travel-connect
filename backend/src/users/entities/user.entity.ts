@@ -28,6 +28,9 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   avatar_url!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  bio!: string | null;
+
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   role!: UserRole;
 

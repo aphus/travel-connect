@@ -6,25 +6,26 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
-    private toPublicUser(user: User) {
-      return {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        avatar_url: user.avatar_url,
-        trust_score: user.trust_score,
-        tripsCreated: user.tripsCreated,
-        role: user.role,
-        is_banned: user.is_banned,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-      };
-    }
+  private toPublicUser(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
+      trust_score: user.trust_score,
+      tripsCreated: user.tripsCreated,
+      role: user.role,
+      is_banned: user.is_banned,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      bio: user.bio,
+    };
+  }
 
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-  ) {}
+  ) { }
 
   findAll() {
     return this.usersRepository.find({

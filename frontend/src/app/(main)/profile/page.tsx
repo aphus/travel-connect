@@ -10,18 +10,29 @@ import {
     FolderPlus,
     Loader2,
     Mail,
-    MessageSquare,
-    ShieldCheck,
     Star,
-    User,
+    Award,
+    MapPin,
+    Calendar,
+    Edit,
+    CheckCircle2,
+    Camera
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+
 import {
     getCurrentUser,
     storeAuthUser,
@@ -32,9 +43,15 @@ import { ApiError } from "@/services/fetchWrapper";
 import { getUserInitials } from "@/lib/user";
 import UserReviews from "@/components/review/UserReviews";
 import { getUserReviews, type UserReview } from "@/services/reviews";
+import { uploadImage } from "@/services/auth";
+
+// IMPORT THÊM ĐỒ NGHỀ CHO CHUYẾN ĐI
+import { getMyCreatedTrips, getMyJoinedTrips, tripToCardData, type Trip } from "@/services/trips";
+import TripCard from "@/components/trip/TripCard";
 
 const profileSchema = z.object({
     name: z.string().min(2, { message: "Tên phải có ít nhất 2 ký tự" }),
+    bio: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -43,8 +60,45 @@ export default function EnhancedProfilePage() {
     const router = useRouter();
     const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
     const [reviews, setReviews] = useState<UserReview[]>([]);
+
+    // STATE MỚI: Chứa danh sách chuyến đi
+    const [upcomingTrips, setUpcomingTrips] = useState<Trip[]>([]);
+
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [statusMessage, setStatusMessage] = useState("");
+
+    const [activeTab, setActiveTab] = useState<"about" | "upcoming" | "reviews">("about");
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            setStatusMessage("Vui lòng chọn file hình ảnh.");
+            return;
+        }
+
+        setIsUploadingAvatar(true);
+        setStatusMessage("");
+
+        try {
+            const uploadResult = await uploadImage(file);
+
+            const updatedUser = await updateCurrentUser({ avatarUrl: uploadResult.url });
+
+            setCurrentUser(updatedUser);
+            storeAuthUser(updatedUser);
+            setStatusMessage("Cập nhật ảnh đại diện thành công!");
+        } catch (error) {
+            setStatusMessage("Lỗi khi tải ảnh lên. Vui lòng thử lại.");
+        } finally {
+            setIsUploadingAvatar(false);
+            e.target.value = "";
+        }
+    };
 
     const {
         register,
@@ -53,9 +107,7 @@ export default function EnhancedProfilePage() {
         formState: { errors, isSubmitting },
     } = useForm<ProfileFormValues>({
         resolver: zodResolver(profileSchema),
-        defaultValues: {
-            name: "",
-        },
+        defaultValues: { name: "", bio: "" },
     });
 
     useEffect(() => {
@@ -68,23 +120,41 @@ export default function EnhancedProfilePage() {
 
                 setCurrentUser(user);
                 storeAuthUser(user);
-                reset({ name: user.fullName });
+                reset({ name: user.fullName, bio: user.bio || "" });
 
                 try {
-                    const userReviews = await getUserReviews(user.id);
-                    if (isMounted) setReviews(userReviews);
+                    // Gọi song song cả Reviews và Trips cho nhanh
+                    const [userReviews, createdTrips, joinedTrips] = await Promise.all([
+                        getUserReviews(user.id),
+                        getMyCreatedTrips(),
+                        getMyJoinedTrips()
+                    ]);
+
+                    if (isMounted) {
+                        setReviews(userReviews);
+
+                        // Gộp chuyến đi, lọc trùng lặp và chỉ lấy chuyến Upcoming/Ongoing
+                        const allTrips = [...createdTrips, ...joinedTrips];
+                        const uniqueTrips = Array.from(new Map(allTrips.map(trip => [trip.id, trip])).values());
+
+                        const upcoming = uniqueTrips
+                            .filter(trip => trip.status === "upcoming" || trip.status === "ongoing")
+                            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+                        setUpcomingTrips(upcoming);
+                    }
                 } catch {
-                    if (isMounted) setReviews([]);
+                    if (isMounted) {
+                        setReviews([]);
+                        setUpcomingTrips([]);
+                    }
                 }
             } catch (error) {
                 if (!isMounted) return;
-
                 if (error instanceof ApiError && [401, 403].includes(error.status)) {
                     router.replace("/login");
                     return;
                 }
-
-                setStatusMessage("Không thể tải hồ sơ tài khoản");
             } finally {
                 if (isMounted) setIsLoadingProfile(false);
             }
@@ -99,134 +169,233 @@ export default function EnhancedProfilePage() {
 
     const onSubmit = async (data: ProfileFormValues) => {
         setStatusMessage("");
-
         try {
-            const updatedUser = await updateCurrentUser({ fullName: data.name.trim() });
+            const updatedUser = await updateCurrentUser({ fullName: data.name.trim(), bio: data.bio });
             setCurrentUser(updatedUser);
             storeAuthUser(updatedUser);
-            reset({ name: updatedUser.fullName });
-            setStatusMessage("Cập nhật hồ sơ thành công");
+            reset({ name: updatedUser.fullName, bio: updatedUser.bio || "" });
+            setIsDialogOpen(false);
         } catch (error) {
             if (error instanceof ApiError && [401, 403].includes(error.status)) {
                 router.replace("/login");
                 return;
             }
-
             setStatusMessage("Không thể cập nhật hồ sơ");
         }
+    };
+
+    const handleOpenChange = (open: boolean) => {
+        setIsDialogOpen(open);
+        if (!open) setStatusMessage("");
     };
 
     if (isLoadingProfile) {
         return (
             <div className="container mx-auto px-4 py-16 flex justify-center">
-                <Card className="w-full max-w-2xl border-slate-200 shadow-md">
-                    <CardContent className="p-10 flex items-center justify-center text-slate-500">
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang tải hồ sơ...
-                    </CardContent>
-                </Card>
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
             </div>
         );
     }
 
     const trustScore = currentUser?.trustScore ?? 0;
     const displayTrustScore = trustScore.toFixed(1);
-    const filledStars = Math.min(5, Math.max(0, Math.round(trustScore)));
 
     return (
-        <div className="container mx-auto px-4 py-8 flex justify-center">
-            <Card className="w-full max-w-2xl border-slate-200 shadow-md">
-                <CardContent className="p-8 flex flex-col items-center">
-                    <Avatar className="h-28 w-28 border-4 border-blue-50 shadow-md mb-4">
-                        <AvatarFallback className="bg-blue-600 text-white text-3xl font-bold">
+        <div className="container max-w-5xl mx-auto px-4 py-10">
+            {/* --- HEADER --- */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
+                {/* --- KHỐI AVATAR MỚI (CÓ NÚT UPLOAD) --- */}
+                <div className="relative group shrink-0">
+                    <Avatar className="h-32 w-32 md:h-40 md:w-40 border-[6px] border-slate-50 shadow-sm rounded-full overflow-hidden">
+                        <AvatarImage
+                            src={currentUser?.avatarUrl || ""}
+                            className="object-cover w-full h-full"
+                        />
+                        <AvatarFallback className="bg-slate-800 text-white text-4xl font-bold rounded-full">
                             {getUserInitials(currentUser)}
                         </AvatarFallback>
                     </Avatar>
 
-                    <h2 className="text-2xl font-bold text-slate-900 mb-1">
-                        {currentUser?.fullName ?? "TripConnect User"}
-                    </h2>
-                    <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
-                        <Mail className="h-4 w-4" /> {currentUser?.email}
-                    </div>
-                    <div className="flex items-center gap-1 text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded-md mb-6">
-                        <ShieldCheck className="h-4 w-4" /> Đã đăng nhập
+                    {/* Hiệu ứng Loading */}
+                    {isUploadingAvatar && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 rounded-full z-10">
+                            <Loader2 className="h-8 w-8 text-white animate-spin" />
+                        </div>
+                    )}
+
+                    {/* Lớp phủ Camera khi hover */}
+                    <label className="absolute inset-0 flex items-center justify-center bg-slate-900/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-0">
+                        <Camera className="h-8 w-8 text-white" />
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleAvatarChange}
+                            disabled={isUploadingAvatar}
+                        />
+                    </label>
+                </div>
+
+                <div className="flex-1 text-center md:text-left mt-2">
+                    <div className="flex flex-col md:flex-row items-center gap-3 mb-2">
+                        <h1 className="text-3xl font-bold text-slate-900">
+                            {currentUser?.fullName ?? "TripConnect User"}
+                        </h1>
+                        <span className="flex items-center gap-1.5 bg-slate-800 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+                        </span>
                     </div>
 
-                    <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-8 flex flex-col items-center">
-                        <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Điểm Uy Tín (Trust Score)</div>
+                    <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-slate-600 mb-4">
+                        <span className="flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4" /> Vietnam
+                        </span>
+                        <span className="hidden md:inline text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                            <Calendar className="h-4 w-4" /> Thành viên từ 2026
+                        </span>
+                    </div>
+                </div>
 
-                        <div className="flex items-center gap-1.5 mb-2">
-                            <span className="text-3xl font-black text-slate-800 mr-1">{displayTrustScore}</span>
+                <div className="mt-2">
+                    <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="gap-2 rounded-full font-medium shadow-sm">
+                                <Edit className="h-4 w-4" /> Chỉnh sửa hồ sơ
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-xl font-bold">Cập nhật hồ sơ</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name" className="text-sm font-bold text-slate-700">Họ và Tên</Label>
+                                    <Input id="name" className={errors.name ? "border-red-500" : ""} {...register("name")} />
+                                    {errors.name?.message && <p className="text-xs font-medium text-red-600">{errors.name.message}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="bio" className="text-sm font-bold text-slate-700">Giới thiệu bản thân (Bio)</Label>
+                                    <Textarea id="bio" placeholder="Chia sẻ một chút về đam mê du lịch của bạn..." rows={5} {...register("bio")} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email" className="text-sm font-bold text-slate-700">Email (Không thể đổi)</Label>
+                                    <Input id="email" value={currentUser?.email ?? ""} disabled className="bg-slate-50 text-slate-500" />
+                                </div>
+                                {statusMessage && (
+                                    <p className="rounded-md bg-red-50 border border-red-100 px-4 py-3 text-sm font-semibold text-red-700">
+                                        {statusMessage}
+                                    </p>
+                                )}
+                                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                                    <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
+                                    <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white" disabled={isSubmitting}>
+                                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu...</> : "Lưu thay đổi"}
+                                    </Button>
+                                </div>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </div>
+
+            {/* --- THỐNG KÊ --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                <Card className="border-slate-200 shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <div className="flex gap-1 mb-2">
                             {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                    key={star}
-                                    className={`h-6 w-6 ${star <= filledStars ? "fill-amber-400 text-amber-400" : "fill-amber-400/20 text-amber-400/40"}`}
-                                />
+                                <Star key={star} className="h-5 w-5 fill-slate-800 text-slate-800" />
                             ))}
                         </div>
+                        <span className="text-3xl font-bold text-slate-900 mb-1">{displayTrustScore}</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Average Rating</span>
+                    </CardContent>
+                </Card>
 
-                        <div className="grid grid-cols-3 w-full gap-2 text-center mt-4 border-t pt-4 border-slate-200/60">
-                            <div className="flex flex-col items-center justify-center">
-                                <div className="flex items-center gap-1 text-slate-700 font-extrabold text-lg">
-                                    <MessageSquare className="h-4 w-4 text-blue-500" /> {reviews.length}
+                <Card className="border-slate-200 shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <Award className="h-6 w-6 text-slate-400 mb-3" />
+                        <span className="text-3xl font-bold text-slate-900 mb-1">0</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Trips Completed</span>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <MapPin className="h-6 w-6 text-slate-400 mb-3" />
+                        <span className="text-3xl font-bold text-slate-900 mb-1">{currentUser?.tripsCreated ?? 0}</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Trips Created</span>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* --- NAVIGATION TABS --- */}
+            <div className="flex border-b border-slate-200 mb-8 gap-8 px-2 overflow-x-auto">
+                <button
+                    onClick={() => setActiveTab("about")}
+                    className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "about" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    Về tôi
+                </button>
+                <button
+                    onClick={() => setActiveTab("upcoming")}
+                    className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "upcoming" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    Sắp tới {upcomingTrips.length > 0 && `(${upcomingTrips.length})`}
+                </button>
+                <button
+                    onClick={() => setActiveTab("reviews")}
+                    className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "reviews" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    Đánh giá ({reviews.length})
+                </button>
+            </div>
+
+            {/* --- TABS CONTENT --- */}
+            <div className="min-h-[300px]">
+                {/* TAB: VỀ TÔI */}
+                {activeTab === "about" && (
+                    <div className="animate-in fade-in duration-300">
+                        <Card className="border-slate-200 shadow-sm">
+                            <CardContent className="p-8">
+                                <h3 className="text-lg font-bold text-slate-900 mb-4">Giới thiệu</h3>
+                                <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                    {currentUser?.bio ? currentUser.bio : "Chưa có thông tin giới thiệu. Hãy thêm vài dòng để mọi người hiểu hơn về bạn nhé!"}
                                 </div>
-                                <span className="text-[11px] font-medium text-slate-500 uppercase mt-0.5">Nhận xét</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center border-x border-slate-200/60">
-                                <div className="flex items-center gap-1 text-slate-700 font-extrabold text-lg">
-                                    <CheckCircle className="h-4 w-4 text-emerald-500" /> 0
-                                </div>
-                                <span className="text-[11px] font-medium text-slate-500 uppercase mt-0.5">Đã hoàn thành</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center">
-                                <div className="flex items-center gap-1 text-slate-700 font-extrabold text-lg">
-                                    <FolderPlus className="h-4 w-4 text-orange-500" /> {currentUser?.tripsCreated ?? 0}
-                                </div>
-                                <span className="text-[11px] font-medium text-slate-500 uppercase mt-0.5">Đã tạo</span>
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
                     </div>
+                )}
 
-                    <Separator className="w-full mb-6" />
-
-                    <form onSubmit={handleSubmit(onSubmit)} className="w-full text-left space-y-5">
-                        <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide mb-2">Thông tin tài khoản</h3>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="name" className="text-xs font-bold text-slate-600">Họ và Tên</Label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                <Input id="name" className={`pl-9 h-11 bg-white border-slate-200 ${errors.name ? "border-red-500" : ""}`} {...register("name")} />
+                {/* TAB: SẮP TỚI */}
+                {activeTab === "upcoming" && (
+                    <div className="animate-in fade-in duration-300">
+                        {upcomingTrips.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {upcomingTrips.map((trip) => (
+                                    <TripCard key={trip.id} trip={tripToCardData(trip)} />
+                                ))}
                             </div>
-                            {errors.name?.message && (
-                                <p className="text-xs font-medium text-red-600">{errors.name.message}</p>
-                            )}
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-xs font-bold text-slate-600">Email</Label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                <Input id="email" value={currentUser?.email ?? ""} disabled className="pl-9 h-11 bg-slate-50 border-slate-200 text-slate-500" />
-                            </div>
-                        </div>
-
-                        {statusMessage && (
-                            <p className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm font-semibold text-blue-700" role="status">
-                                {statusMessage}
-                            </p>
+                        ) : (
+                            <Card className="border-slate-200 shadow-sm border-dashed">
+                                <CardContent className="p-16 flex flex-col items-center justify-center text-slate-500 text-center">
+                                    <Calendar className="h-12 w-12 text-slate-300 mb-4" />
+                                    <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có chuyến đi nào</h3>
+                                    <p className="text-sm">Bạn chưa có chuyến đi nào sắp diễn ra.</p>
+                                </CardContent>
+                            </Card>
                         )}
+                    </div>
+                )}
 
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 font-bold h-11 text-sm shadow-sm" disabled={isSubmitting}>
-                            {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu...</> : "CẬP NHẬT HỒ SƠ"}
-                        </Button>
-                    </form>
-
-                    <Separator className="w-full my-8" />
-
-                    <UserReviews reviews={reviews} />
-                </CardContent>
-            </Card>
+                {/* TAB: ĐÁNH GIÁ */}
+                {activeTab === "reviews" && (
+                    <div className="animate-in fade-in duration-300">
+                        <UserReviews reviews={reviews} />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -6,7 +6,7 @@ import * as streamifier from 'streamifier';
 export class UploadService {
     // Đã xóa hàm constructor() để tránh lỗi bất đồng bộ của NestJS
 
-    uploadImage(file: Express.Multer.File): Promise<any> {
+    uploadImage(file: Express.Multer.File, folderName: string = 'travel_connect'): Promise<any> {
         return new Promise((resolve, reject) => {
             // 1. In ra Terminal để kiểm chứng chắc chắn 100% NestJS đã đọc được file .env
             console.log("🔍 KIỂM TRA BIẾN MÔI TRƯỜNG:");
@@ -22,7 +22,7 @@ export class UploadService {
             });
 
             const uploadStream = cloudinary.uploader.upload_stream(
-                { folder: 'travel_connect' },
+                { folder: folderName },
                 (error, result) => {
                     if (error) {
                         console.error("🔴 LỖI CLOUDINARY:", JSON.stringify(error, null, 2));
