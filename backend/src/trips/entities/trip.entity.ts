@@ -66,6 +66,9 @@ export class Trip {
   @Column({ name: 'leader_id', type: 'uuid' })
   leaderId!: string;
 
+  @Column({ name: 'cover_url', type: 'text', nullable: true })
+  coverUrl!: string | null;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'leader_id' })
   leader!: User;

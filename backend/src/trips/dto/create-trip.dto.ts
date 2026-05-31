@@ -39,4 +39,8 @@ export class CreateTripDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  coverUrl?: string;
 }

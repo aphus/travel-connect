@@ -16,6 +16,7 @@ import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     RealtimeModule,
     ReportsModule,
     NotificationsModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

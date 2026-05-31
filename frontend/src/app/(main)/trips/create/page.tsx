@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { MapPin, DollarSign, Users, Type, AlignLeft, Loader2, ImagePlus, Compass } from "lucide-react";
+import { MapPin, DollarSign, Users, Type, AlignLeft, Loader2, ImagePlus, Compass, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +65,11 @@ type CreateTripFormValues = z.infer<typeof createTripSchema>;
 export default function CreateTripPage() {
     const router = useRouter();
     const [submitError, setSubmitError] = useState("");
+
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const minTripDate = getTomorrowDateInputValue();
     const {
         register,
@@ -75,6 +80,30 @@ export default function CreateTripPage() {
         resolver: zodResolver(createTripSchema),
     });
     const selectedStartDate = watch("startDate");
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                setSubmitError("Kích thước ảnh vượt quá 5MB");
+                return;
+            }
+            setImageFile(file);
+            setPreviewUrl(URL.createObjectURL(file));
+            setSubmitError("");
+        }
+    };
+
+    const handleRemoveImage = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Ngăn không cho sự kiện click lan ra khung ngoài
+        setImageFile(null);
+        setPreviewUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
 
     const onSubmit = async (data: CreateTripFormValues) => {
         setSubmitError("");
@@ -88,6 +117,38 @@ export default function CreateTripPage() {
         }
 
         try {
+            let uploadedCoverUrl = null;
+
+            // 1. Upload ảnh trước nếu người dùng có chọn ảnh
+            if (imageFile) {
+                const formData = new FormData();
+                formData.append("file", imageFile);
+
+                // Lấy Token từ LocalStorage để làm thẻ thông hành
+                const token = typeof window !== 'undefined'
+                    ? (localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('accessToken'))
+                    : null;
+
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+                // Gọi API kèm theo Token ở phần headers
+                const uploadRes = await fetch(`${baseUrl}/upload/image`, {
+                    method: "POST",
+                    body: formData,
+                    headers: token ? {
+                        'Authorization': `Bearer ${token}`
+                    } : {},
+                });
+
+                if (!uploadRes.ok) {
+                    throw new Error("Lỗi khi tải ảnh lên. Vui lòng thử lại!");
+                }
+
+                const uploadData = await uploadRes.json();
+                uploadedCoverUrl = uploadData.url; // Lấy link ảnh Cloudinary trả về
+            }
+
+            // 2. Gửi dữ liệu tạo chuyến đi (kèm link ảnh) xuống backend
             const trip = await createTrip({
                 destination: data.location.trim(),
                 startDate: data.startDate,
@@ -95,6 +156,7 @@ export default function CreateTripPage() {
                 budget,
                 maxMembers,
                 description: `${data.title.trim()}\n\n${data.description.trim()}`,
+                coverUrl: uploadedCoverUrl,
             });
 
             setAuthFlash("Tạo chuyến đi thành công.");
@@ -253,10 +315,41 @@ export default function CreateTripPage() {
 
                                 <div className="space-y-2">
                                     <Label className="font-semibold text-slate-700">Ảnh đại diện chuyến đi</Label>
-                                    <div className="border-2 border-dashed border-blue-200 bg-blue-50/50 rounded-xl p-10 text-center hover:bg-blue-50 transition-colors cursor-pointer group">
-                                        <ImagePlus className="mx-auto h-10 w-10 text-blue-400 mb-3 group-hover:scale-110 transition-transform" />
-                                        <p className="text-sm text-slate-700 font-semibold">Nhấn để tải ảnh lên (hoặc kéo thả vào đây)</p>
-                                        <p className="text-xs text-slate-500 mt-2">PNG, JPG, WEBP lên đến 5MB</p>
+
+                                    {/* Input ẩn */}
+                                    <input
+                                        type="file"
+                                        accept="image/png, image/jpeg, image/webp"
+                                        className="hidden"
+                                        ref={fileInputRef}
+                                        onChange={handleImageChange}
+                                    />
+
+                                    {/* Khung hiển thị */}
+                                    <div
+                                        onClick={handleImageClick}
+                                        className="relative border-2 border-dashed border-blue-200 bg-blue-50/50 rounded-xl p-2 text-center hover:bg-blue-50 transition-colors cursor-pointer group min-h-[160px] flex flex-col items-center justify-center overflow-hidden"
+                                    >
+                                        {previewUrl ? (
+                                            <>
+                                                <img src={previewUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg shadow-sm" />
+                                                <Button
+                                                    type="button"
+                                                    variant="destructive"
+                                                    size="icon"
+                                                    className="absolute top-4 right-4 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                                    onClick={handleRemoveImage}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <div className="py-8">
+                                                <ImagePlus className="mx-auto h-10 w-10 text-blue-400 mb-3 group-hover:scale-110 transition-transform" />
+                                                <p className="text-sm text-slate-700 font-semibold">Nhấn để tải ảnh lên (hoặc kéo thả vào đây)</p>
+                                                <p className="text-xs text-slate-500 mt-2">PNG, JPG, WEBP lên đến 5MB</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
