@@ -11,4 +11,8 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(500)
   avatar_url?: string;
+
+  @IsOptional()
+  @IsString()
+  bio?: string;
 }

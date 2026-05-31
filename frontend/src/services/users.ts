@@ -10,6 +10,7 @@ export type PublicUser = {
   role: string;
   isBanned: boolean;
   createdAt: string;
+  bio?: string | null;
 };
 
 type RawPublicUser = {
@@ -28,6 +29,7 @@ type RawPublicUser = {
   is_banned?: boolean;
   createdAt?: string;
   created_at?: string;
+  bio?: string | null;
 };
 
 export async function getUserProfile(id: string) {
@@ -46,5 +48,6 @@ function normalizePublicUser(user: RawPublicUser): PublicUser {
     role: user.role,
     isBanned: user.isBanned ?? user.is_banned ?? false,
     createdAt: user.createdAt ?? user.created_at ?? "",
+    bio: user.bio ?? null,
   };
 }

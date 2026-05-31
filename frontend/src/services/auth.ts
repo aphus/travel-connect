@@ -9,6 +9,7 @@ export type AuthUser = {
   trustScore: number;
   tripsCreated: number;
   isBanned?: boolean;
+  bio?: string | null;
 };
 
 export type AuthResponse = {
@@ -41,10 +42,33 @@ export async function getCurrentUser() {
   return normalizeAuthUser(user);
 }
 
-export async function updateCurrentUser(payload: { fullName: string }) {
+export async function uploadImage(file: File) {
+  const formData = new FormData();
+
+  formData.append("folder", "trip_avatars");
+  formData.append("file", file);
+
+  return fetchWrapper<{ url: string }>("/upload/image", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function updateCurrentUser(payload: {
+  fullName?: string;
+  bio?: string;
+  avatarUrl?: string
+}) {
+  const body: any = {};
+  if (payload.fullName) body.full_name = payload.fullName;
+  if (payload.bio !== undefined) body.bio = payload.bio;
+  if (payload.avatarUrl !== undefined) {
+    body.avatar_url = payload.avatarUrl;
+  }
+
   const user = await fetchWrapper<RawAuthUser>("/users/me", {
     method: "PATCH",
-    body: JSON.stringify({ full_name: payload.fullName }),
+    body: JSON.stringify(body),
   });
 
   return normalizeAuthUser(user);
@@ -109,6 +133,7 @@ type RawAuthUser = {
   trips_created?: number;
   isBanned?: boolean;
   is_banned?: boolean;
+  bio?: string | null;
 };
 
 function normalizeAuthUser(user: RawAuthUser): AuthUser {
@@ -121,5 +146,6 @@ function normalizeAuthUser(user: RawAuthUser): AuthUser {
     trustScore: Number(user.trustScore ?? user.trust_score ?? 0),
     tripsCreated: Number(user.tripsCreated ?? user.trips_created ?? 0),
     isBanned: user.isBanned ?? user.is_banned,
+    bio: user.bio ?? null,
   };
 }

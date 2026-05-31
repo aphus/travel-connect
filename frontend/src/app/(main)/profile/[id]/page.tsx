@@ -4,15 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     CalendarDays,
-    FolderPlus,
     Loader2,
-    Mail,
-    MessageSquare,
-    ShieldCheck,
+    MapPin,
     Star,
+    Award,
+    CheckCircle2
 } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiError } from "@/services/fetchWrapper";
 import UserReviews from "@/components/review/UserReviews";
@@ -22,10 +21,13 @@ import { getUserProfile, type PublicUser } from "@/services/users";
 export default function PublicProfilePage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
-    const [user, setUser] = useState<PublicUser | null>(null);
+    // Ép kiểu nhẹ để hứng bio (nếu type PublicUser chưa được cập nhật)
+    const [user, setUser] = useState<(PublicUser & { bio?: string | null }) | null>(null);
     const [reviews, setReviews] = useState<UserReview[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
+
+    const [activeTab, setActiveTab] = useState<"about" | "reviews">("about");
 
     useEffect(() => {
         let isActive = true;
@@ -77,12 +79,8 @@ export default function PublicProfilePage() {
 
     if (isLoading) {
         return (
-            <div className="container mx-auto flex justify-center px-4 py-16">
-                <Card className="w-full max-w-2xl border-slate-200 shadow-md">
-                    <CardContent className="flex items-center justify-center p-10 text-slate-500">
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang tải trang cá nhân...
-                    </CardContent>
-                </Card>
+            <div className="container mx-auto px-4 py-16 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
             </div>
         );
     }
@@ -97,97 +95,132 @@ export default function PublicProfilePage() {
         );
     }
 
-    const trustScore = user.trustScore;
-    const filledStars = Math.min(5, Math.max(0, Math.round(trustScore)));
+    const trustScore = user.trustScore ?? 0;
+    const displayTrustScore = trustScore.toFixed(1);
+
+    const shortName = user.fullName.split(" ").pop() || "Thành viên";
 
     return (
-        <div className="container mx-auto flex justify-center px-4 py-8">
-            <Card className="w-full max-w-2xl border-slate-200 shadow-md">
-                <CardContent className="flex flex-col items-center p-8">
-                    <Avatar className="mb-4 h-28 w-28 border-4 border-blue-50 shadow-md">
-                        <AvatarFallback className="bg-blue-600 text-3xl font-bold text-white">
-                            {getInitials(user.fullName)}
-                        </AvatarFallback>
-                    </Avatar>
+        <div className="container max-w-5xl mx-auto px-4 py-10">
+            {/* --- HEADER SECTION --- */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
+                <Avatar className="h-32 w-32 md:h-40 md:w-40 border-[6px] border-slate-50 shadow-sm rounded-full overflow-hidden">
+                    <AvatarImage
+                        src={user.avatarUrl || ""}
+                        className="object-cover w-full h-full"
+                    />
+                    <AvatarFallback className="bg-slate-800 text-white text-4xl font-bold rounded-full">
+                        {getInitials(user.fullName)}
+                    </AvatarFallback>
+                </Avatar>
 
-                    <h1 className="mb-1 text-2xl font-bold text-slate-900">
-                        {user.fullName}
-                    </h1>
-                    <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
-                        <Mail className="h-4 w-4" /> {user.email}
+                <div className="flex-1 text-center md:text-left mt-2">
+                    <div className="flex flex-col md:flex-row items-center gap-3 mb-2">
+                        <h1 className="text-3xl font-bold text-slate-900">
+                            {user.fullName}
+                        </h1>
+                        <span className="flex items-center gap-1.5 bg-slate-800 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+                        </span>
                     </div>
-                    <div className="mb-6 flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-sm font-medium text-green-600">
-                        <ShieldCheck className="h-4 w-4" /> Hồ sơ TripConnect
+
+                    <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-slate-600 mb-4">
+                        <span className="flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4" /> Vietnam
+                        </span>
+                        <span className="hidden md:inline text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5">
+                            <CalendarDays className="h-4 w-4" /> Tham gia {formatJoinedYear(user.createdAt)}
+                        </span>
                     </div>
+                </div>
+            </div>
 
-                    <div className="mb-8 flex w-full flex-col items-center rounded-2xl border border-slate-100 bg-slate-50 p-5">
-                        <div className="mb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
-                            Điểm Uy Tín
-                        </div>
-
-                        <div className="mb-2 flex items-center gap-1.5">
-                            <span className="mr-1 text-3xl font-black text-slate-800">
-                                {trustScore.toFixed(1)}
-                            </span>
+            {/* --- STATS SECTION --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                <Card className="border-slate-200 shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <div className="flex gap-1 mb-2">
                             {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                    key={star}
-                                    className={`h-6 w-6 ${star <= filledStars ? "fill-amber-400 text-amber-400" : "fill-amber-400/20 text-amber-400/40"}`}
-                                />
+                                <Star key={star} className="h-5 w-5 fill-slate-800 text-slate-800" />
                             ))}
                         </div>
+                        <span className="text-3xl font-bold text-slate-900 mb-1">{displayTrustScore}</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Average Rating</span>
+                    </CardContent>
+                </Card>
 
-                        <div className="mt-4 grid w-full grid-cols-3 gap-2 border-t border-slate-200/60 pt-4 text-center">
-                            <div className="flex flex-col items-center justify-center">
-                                <div className="flex items-center gap-1 text-lg font-extrabold text-slate-700">
-                                    <MessageSquare className="h-4 w-4 text-blue-500" /> {reviews.length}
+                <Card className="border-slate-200 shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <Award className="h-6 w-6 text-slate-400 mb-3" />
+                        <span className="text-3xl font-bold text-slate-900 mb-1">0</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Trips Completed</span>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <MapPin className="h-6 w-6 text-slate-400 mb-3" />
+                        <span className="text-3xl font-bold text-slate-900 mb-1">{user.tripsCreated ?? 0}</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Trips Created</span>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* --- TABS NAVIGATION --- */}
+            <div className="flex border-b border-slate-200 mb-8 gap-8 px-2 overflow-x-auto">
+                <button
+                    onClick={() => setActiveTab("about")}
+                    className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "about" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    Về {shortName}
+                </button>
+                <button
+                    onClick={() => setActiveTab("reviews")}
+                    className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "reviews" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    Đánh giá ({reviews.length})
+                </button>
+            </div>
+
+            {/* --- TABS CONTENT --- */}
+            <div className="min-h-[300px]">
+                {/* TAB: VỀ TÔI */}
+                {activeTab === "about" && (
+                    <div className="animate-in fade-in duration-300">
+                        <Card className="border-slate-200 shadow-sm">
+                            <CardContent className="p-8">
+                                <h3 className="text-lg font-bold text-slate-900 mb-4">Giới thiệu</h3>
+                                <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                    {(user as any).bio ? (user as any).bio : "Thành viên này chưa cập nhật thông tin giới thiệu."}
                                 </div>
-                                <span className="mt-0.5 text-[11px] font-medium uppercase text-slate-500">
-                                    Nhận xét
-                                </span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center border-r border-slate-200/60">
-                                <div className="flex items-center gap-1 text-lg font-extrabold text-slate-700">
-                                    <FolderPlus className="h-4 w-4 text-orange-500" /> {user.tripsCreated}
-                                </div>
-                                <span className="mt-0.5 text-[11px] font-medium uppercase text-slate-500">
-                                    Đã tạo
-                                </span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center">
-                                <div className="flex items-center gap-1 text-lg font-extrabold text-slate-700">
-                                    <CalendarDays className="h-4 w-4 text-blue-500" />
-                                    {formatJoinedDate(user.createdAt)}
-                                </div>
-                                <span className="mt-0.5 text-[11px] font-medium uppercase text-slate-500">
-                                    Tham gia
-                                </span>
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
                     </div>
+                )}
 
-                    <UserReviews reviews={reviews} />
-                </CardContent>
-            </Card>
+                {/* TAB: ĐÁNH GIÁ */}
+                {activeTab === "reviews" && (
+                    <div className="animate-in fade-in duration-300">
+                        <UserReviews reviews={reviews} />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
 function getInitials(name: string) {
+    if (!name) return "TC";
     const words = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
     if (words.length === 0) return "TC";
     if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
     return words.map((word) => word[0]).join("").toUpperCase();
 }
 
-function formatJoinedDate(value: string) {
+function formatJoinedYear(value: string) {
     if (!value) return "N/A";
-
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "N/A";
-
-    return new Intl.DateTimeFormat("vi-VN", {
-        month: "2-digit",
-        year: "numeric",
-    }).format(date);
+    return date.getFullYear().toString();
 }
