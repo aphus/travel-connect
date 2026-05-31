@@ -50,7 +50,7 @@ export class TripsService {
     private readonly tripsRepository: Repository<Trip>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   private validateTripDates(startDate: string, endDate: string) {
     if (startDate > endDate) {
@@ -154,15 +154,16 @@ export class TripsService {
       status: normalizeTripStatus(trip.status),
       leaderMarkedCompleted: trip.leaderMarkedCompleted,
       leaderId: trip.leaderId,
+      coverUrl: trip.coverUrl,
       createdAt: trip.createdAt,
       updatedAt: trip.updatedAt,
       leader: trip.leader
         ? {
-            id: trip.leader.id,
-            full_name: trip.leader.full_name,
-            avatar_url: trip.leader.avatar_url,
-            trust_score: Number(trip.leader.trust_score),
-          }
+          id: trip.leader.id,
+          full_name: trip.leader.full_name,
+          avatar_url: trip.leader.avatar_url,
+          trust_score: Number(trip.leader.trust_score),
+        }
         : null,
     };
   }
@@ -328,6 +329,7 @@ export class TripsService {
         maxMembers: dto.maxMembers,
         description: dto.description?.trim() || null,
         leaderId,
+        coverUrl: dto.coverUrl || null,
       });
 
       const savedTrip = await manager.getRepository(Trip).save(trip);
@@ -445,10 +447,10 @@ export class TripsService {
         stats: stats.get(trip.id) ?? { currentMembers: 1, pendingRequests: 0 },
         score: hasSearchFilters
           ? this.scoreTripSearch(
-              trip,
-              stats.get(trip.id) ?? { currentMembers: 1, pendingRequests: 0 },
-              filters,
-            )
+            trip,
+            stats.get(trip.id) ?? { currentMembers: 1, pendingRequests: 0 },
+            filters,
+          )
           : 0,
       }))
       .sort((left, right) => {

@@ -41,4 +41,8 @@ export class UpdateTripDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  coverUrl?: string;
 }

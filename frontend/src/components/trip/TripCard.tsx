@@ -16,7 +16,7 @@ export interface Trip {
     budget: string;
     currentMembers: number;
     maxMembers: number;
-    imageUrl: string;
+    coverUrl: string;
     leader: {
         name: string;
         avatarUrl?: string;
@@ -39,7 +39,11 @@ export default function TripCard({ trip }: TripCardProps) {
                 {/* ... (Toàn bộ code hiển thị ảnh, tiêu đề, ngày tháng, leader bên trong giữ nguyên y hệt như cũ) ... */}
 
                 <div className="relative h-48 w-full bg-slate-100">
-                    <img src={trip.imageUrl} alt={trip.title} className="object-cover w-full h-full" />
+                    <img
+                        src={trip.coverUrl || "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80"}
+                        alt={trip.title}
+                        className="object-cover w-full h-full"
+                    />
                     <Badge className="absolute top-3 right-3 bg-white/90 text-blue-600 hover:bg-white shadow-sm border-none">{trip.location}</Badge>
                 </div>
 

@@ -38,6 +38,7 @@ export type Trip = {
   leaderMarkedCompleted: boolean;
   createdAt: string;
   leader: TripLeader | null;
+  coverUrl?: string | null;
 };
 
 export type JoinStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELED";
@@ -96,6 +97,8 @@ type RawTrip = {
   createdAt?: string;
   created_at?: string;
   leader?: RawLeader | null;
+  coverUrl?: string | null;
+  cover_url?: string | null;
 };
 
 type RawLeader = {
@@ -157,6 +160,7 @@ export type CreateTripPayload = {
   budget: number;
   maxMembers: number;
   description: string;
+  coverUrl?: string | null;
 };
 
 export type UpdateTripPayload = Partial<CreateTripPayload>;
@@ -343,8 +347,7 @@ export function tripToCardData(trip: Trip): TripCardData {
     budget: formatCurrencyVnd(trip.budget),
     currentMembers: trip.currentMembers,
     maxMembers: trip.maxMembers,
-    imageUrl:
-      "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&q=80&w=900",
+    coverUrl: trip.coverUrl || "",
     leader: {
       name: trip.leader?.fullName ?? "Leader",
       avatarUrl: trip.leader?.avatarUrl ?? undefined,
@@ -403,6 +406,7 @@ function normalizeTrip(trip: RawTrip): Trip {
       trip.leaderMarkedCompleted ?? trip.leader_marked_completed ?? false,
     createdAt: trip.createdAt ?? trip.created_at ?? "",
     leader: trip.leader ? normalizeLeader(trip.leader) : null,
+    coverUrl: trip.coverUrl ?? trip.cover_url ?? null,
   };
 }
 
