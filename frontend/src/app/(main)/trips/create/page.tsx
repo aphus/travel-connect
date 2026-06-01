@@ -6,6 +6,23 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { MapPin, DollarSign, Users, Type, AlignLeft, Loader2, ImagePlus, Compass, X } from "lucide-react";
+import { Controller } from "react-hook-form";
+
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +45,19 @@ import {
 import { setAuthFlash } from "@/services/auth";
 import { createTrip } from "@/services/trips";
 import { ApiError } from "@/services/fetchWrapper";
+
+const VIETNAM_PROVINCES = [
+    "An Giang", "Bà Rịa - Vũng Tàu", "Bạc Liêu", "Bắc Giang", "Bắc Kạn", "Bắc Ninh",
+    "Bến Tre", "Bình Dương", "Bình Định", "Bình Phước", "Bình Thuận", "Cà Mau",
+    "Cao Bằng", "Cần Thơ", "Đà Nẵng", "Đắk Lắk", "Đắk Nông", "Điện Biên", "Đồng Nai",
+    "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Nội", "Hà Tĩnh", "Hải Dương",
+    "Hải Phòng", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Hồ Chí Minh", "Khánh Hòa",
+    "Kiên Giang", "Kon Tum", "Lai Châu", "Lạng Sơn", "Lào Cai", "Lâm Đồng", "Long An",
+    "Nam Định", "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình",
+    "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La",
+    "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang",
+    "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
+];
 
 // Zod Schema
 const createTripSchema = z.object({
@@ -65,6 +95,7 @@ type CreateTripFormValues = z.infer<typeof createTripSchema>;
 export default function CreateTripPage() {
     const router = useRouter();
     const [submitError, setSubmitError] = useState("");
+    const [openLocation, setOpenLocation] = useState(false);
 
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -76,6 +107,7 @@ export default function CreateTripPage() {
         handleSubmit,
         watch,
         formState: { errors, isSubmitting },
+        control
     } = useForm<CreateTripFormValues>({
         resolver: zodResolver(createTripSchema),
     });
@@ -183,7 +215,6 @@ export default function CreateTripPage() {
             <div
                 className="absolute inset-0 z-0 bg-[url('https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed opacity-40"
             />
-            {/* Lớp gradient làm dịu ảnh nền để dễ đọc chữ */}
             <div className="absolute inset-0 z-0 bg-gradient-to-b from-slate-900/10 to-slate-100/90 backdrop-blur-[2px]" />
 
             <div className="container relative z-10 mx-auto px-4 max-w-3xl">
@@ -219,12 +250,74 @@ export default function CreateTripPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="location" className="font-semibold text-slate-700">Địa điểm đến <span className="text-red-500">*</span></Label>
-                                    <div className="relative">
-                                        <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                                        <Input id="location" placeholder="VD: Đà Lạt, Lâm Đồng" className={`pl-11 h-12 text-base bg-slate-50 border-slate-200 transition-all focus:bg-white ${errors.location ? "border-red-500" : ""}`} {...register("location")} />
-                                    </div>
-                                    {errors.location && <p className="text-sm text-red-500 font-medium">{errors.location.message}</p>}
+                                    <Label htmlFor="location" className="font-semibold text-slate-700 flex items-center gap-2">
+                                        Địa điểm đến <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Controller
+                                        control={control}
+                                        name="location"
+                                        render={({ field }) => (
+                                            <Popover open={openLocation} onOpenChange={setOpenLocation}>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        role="combobox"
+                                                        aria-expanded={openLocation}
+                                                        className={cn(
+                                                            "w-full justify-between h-12 bg-slate-50 border-slate-200 text-base font-normal hover:bg-white",
+                                                            !field.value && "text-slate-500",
+                                                            errors.location && "border-red-500"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <MapPin className="mr-2 h-5 w-5 text-slate-400" />
+                                                            {field.value ? field.value : "Chọn tỉnh/thành phố bạn muốn đến..."}
+                                                        </div>
+                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    </Button>
+                                                </PopoverTrigger>
+
+                                                {/* Dùng var(--radix-popover-trigger-width) để menu thả xuống RỘNG BẰNG ĐÚNG cái nút bấm */}
+                                                <PopoverContent
+                                                    className="p-0"
+                                                    style={{ width: "var(--radix-popover-trigger-width)" }}
+                                                    align="start"
+                                                >
+                                                    <Command>
+                                                        <CommandInput placeholder="Gõ tên tỉnh/thành phố..." />
+                                                        <CommandList className="max-h-[250px]">
+                                                            <CommandEmpty>Không tìm thấy địa điểm nào.</CommandEmpty>
+                                                            <CommandGroup>
+                                                                {VIETNAM_PROVINCES.map((province) => (
+                                                                    <CommandItem
+                                                                        key={province}
+                                                                        value={province}
+                                                                        onSelect={() => {
+                                                                            field.onChange(province); // Lưu dữ liệu
+                                                                            setOpenLocation(false); // Chọn xong tự đóng menu
+                                                                        }}
+                                                                    >
+                                                                        <Check
+                                                                            className={cn(
+                                                                                "mr-2 h-4 w-4",
+                                                                                province === field.value ? "opacity-100 text-blue-600" : "opacity-0"
+                                                                            )}
+                                                                        />
+                                                                        {province}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                        )}
+                                    />
+                                    {errors.location && (
+                                        <p className="text-sm text-red-500 font-medium">
+                                            {errors.location.message}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 

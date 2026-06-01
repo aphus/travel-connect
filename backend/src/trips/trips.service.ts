@@ -1112,6 +1112,27 @@ export class TripsService {
       status: TripStatus.AWAITING_CONFIRMATION,
     });
 
+    const members = await this.dataSource
+      .getRepository(TripMember)
+      .createQueryBuilder('member')
+      .innerJoinAndSelect('member.user', 'user')
+      .where('member.trip_id = :tripId', { tripId })
+      .getMany();
+
+    for (const member of members) {
+      // Gửi cho tất cả trừ Leader ra
+      if (member.user.id !== userId) {
+        await this.notificationsService.create({
+          userId: member.user.id,
+          type: NotificationType.TRIP_AWAITING_CONFIRMATION,
+          title: 'Xác nhận hoàn thành chuyến đi',
+          message: `Leader đã đánh dấu chuyến đi ${trip.destination} là hoàn thành. Vui lòng xác nhận để kết thúc!`,
+          targetUrl: `/trips/manage?tab=joined&tripId=${trip.id}`,
+          metadata: { tripId: trip.id },
+        });
+      }
+    }
+
     return this.findOne(tripId);
   }
 
