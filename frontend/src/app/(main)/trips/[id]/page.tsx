@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TripDetail from "@/components/trip/TripDetail";
+import { MapPin } from "lucide-react";
 import {
     getTrip,
     getTripRelation,
@@ -80,21 +81,34 @@ export default function TripPage() {
         );
     }
 
+    const tripDetailInfo = tripToDetailData(trip);
+
     return (
         <div className="container mx-auto px-4 py-8">
-            {/* THÊM KHUNG HIỂN THỊ ẢNH BANNER Ở ĐÂY */}
-            <div className="w-full h-[300px] md:h-[400px] mb-8 rounded-2xl overflow-hidden shadow-md bg-slate-100 relative">
+
+            <div className="w-full h-[300px] md:h-[400px] mb-8 rounded-3xl overflow-hidden shadow-lg bg-slate-900 relative group">
                 <img
                     src={trip.coverUrl || "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80"}
-                    alt={trip.destination || "Banner chuyến đi"}
-                    className="w-full h-full object-cover"
+                    alt={tripDetailInfo.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none"></div>
+
+                <div className="absolute bottom-0 left-0 w-full p-6 md:p-10 pointer-events-none">
+                    <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-3 drop-shadow-lg leading-tight">
+                        {tripDetailInfo.title}
+                    </h1>
+                    <div className="flex items-center gap-2 text-base md:text-lg font-medium text-slate-200">
+                        <MapPin className="h-5 w-5 text-rose-500" />
+                        {trip.destination}
+                    </div>
+                </div>
             </div>
 
-            {/* Component chi tiết chuyến đi cũ giữ nguyên */}
             <TripDetail
                 tripId={params.id}
-                tripData={tripToDetailData(trip)}
+                tripData={tripDetailInfo}
                 relation={relation}
                 onChanged={loadTrip}
             />

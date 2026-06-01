@@ -24,6 +24,7 @@ import {
     type Notification,
 } from "@/services/notifications";
 
+import Logo from "@/components/common/Logo";
 
 export default function SmartHeader() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -154,9 +155,6 @@ export default function SmartHeader() {
     const isTransparentHeader = pathname === "/" || pathname === "/trips/manage";
 
     return (
-        // LỚP VỎ NGOÀI: 
-        // - Trang chủ: absolute top-0 (Không nền, lơ lửng sát viền trên)
-        // - Trang khác: sticky top-0, nền trắng, viền dưới
         <header
             className={`w-full z-50 transition-all duration-300 ${isTransparentHeader
                 ? "absolute top-0 left-0 right-0 pt-4"
@@ -168,16 +166,7 @@ export default function SmartHeader() {
             <div className="container mx-auto max-w-7xl h-16 px-6 md:px-10 flex items-center justify-between">
 
                 {/* LOGO */}
-                <Link href="/" className="flex items-center gap-3 group">
-                    <div className="bg-blue-600 rounded-xl p-2 transition-transform group-hover:scale-105 shadow-sm">
-                        <Compass className="h-6 w-6 text-white" />
-                    </div>
-                    {/* Đổi màu chữ Logo linh hoạt: Trắng (Trang chủ) / Đen (Trang khác) */}
-                    <span className={`text-2xl font-black tracking-tight ${isTransparentHeader ? "text-white drop-shadow-md" : "text-slate-900"
-                        }`}>
-                        TripConnect
-                    </span>
-                </Link>
+                <Logo isWhite={isTransparentHeader} />
 
                 {/* KHU VỰC TÀI KHOẢN */}
                 <div className="flex items-center gap-4">
@@ -268,7 +257,6 @@ export default function SmartHeader() {
 
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    {/* Nút Avatar viên thuốc (Nền trắng) - Phù hợp với mọi loại nền */}
                                     <button className="flex items-center gap-3 bg-white hover:bg-slate-50 border border-slate-300 pl-4 pr-1.5 py-1.5 rounded-full shadow-sm transition-all">
                                         <Menu className="h-5 w-5 text-slate-700" />
                                         <Avatar className="h-8 w-8 border-0 rounded-full">
@@ -315,7 +303,6 @@ export default function SmartHeader() {
                         </>
                     ) : (
                         <div className="flex items-center gap-2">
-                            {/* Đổi màu chữ Đăng ký linh hoạt: Trắng (Trang chủ) / Xám (Trang khác) */}
                             <Link
                                 href="/register"
                                 className={`font-bold text-sm transition-colors px-4 py-2 ${isTransparentHeader ? "text-white hover:text-slate-200 drop-shadow-sm" : "text-slate-700 hover:text-blue-600"

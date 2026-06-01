@@ -466,6 +466,25 @@ export class TripsService {
       );
   }
 
+  async getTrendingDestinations(limit: number = 5) {
+    const trending = await this.tripsRepository
+      .createQueryBuilder('trip')
+      .select('trip.destination', 'destination')
+      .addSelect('COUNT(trip.id)', 'tripCount')
+      .where('trip.status IN (:...statuses)', {
+        statuses: [TripStatus.UPCOMING, TripStatus.ONGOING]
+      })
+      .groupBy('trip.destination')
+      .orderBy('COUNT(trip.id)', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    return trending.map(item => ({
+      destination: item.destination,
+      count: Number(item.tripCount),
+    }));
+  }
+
   async findOne(id: string) {
     const trip = await this.tripsRepository.findOne({ where: { id } });
     if (!trip) {

@@ -19,7 +19,7 @@ import { Public } from '../common/decorators/public.decorator';
 
 @Controller('trips')
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) {}
+  constructor(private readonly tripsService: TripsService) { }
 
   @Public()
   @Get()
@@ -43,6 +43,12 @@ export class TripsController {
   @Get('me/joined')
   findMyJoinedTrips(@CurrentUser() user: { sub: string }) {
     return this.tripsService.findJoinedByUser(user.sub);
+  }
+
+  @Public()
+  @Get('trending/destinations')
+  getTrendingDestinations() {
+    return this.tripsService.getTrendingDestinations(5);
   }
 
   @Public()
