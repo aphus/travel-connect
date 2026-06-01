@@ -151,6 +151,11 @@ export default function SmartHeader() {
         return null;
     }
 
+    // Ẩn Header ở các trang Admin
+    if (pathname?.startsWith("/admin")) {
+        return null;
+    }
+
     // 2. Kiểm tra xem có phải trang chủ không
     const isTransparentHeader = pathname === "/" || pathname === "/trips/manage";
 

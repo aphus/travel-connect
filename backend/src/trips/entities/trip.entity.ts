@@ -4,11 +4,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   ValueTransformer,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { TripMember } from './trip_member.entity';
 
 export enum TripStatus {
   UPCOMING = 'upcoming',
@@ -78,4 +80,7 @@ export class Trip {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+
+  @OneToMany(() => TripMember, (tripMember) => tripMember.trip)
+  members!: TripMember[];
 }

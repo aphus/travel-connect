@@ -113,9 +113,12 @@ export default function ManageMembersSheet({ tripId, isLeader = false, onChanged
                                     </div>
                                 </Link>
 
-                                {/* Nút Báo cáo (Chỉ hiện nếu không phải chính mình) */}
                                 {member.userId !== currentUserId && (
-                                    <ReportUserDialog targetUserId={member.userId} targetUserName={member.name}>
+                                    <ReportUserDialog
+                                        targetUserId={member.userId}
+                                        targetUserName={member.name}
+                                        tripId={tripId}
+                                    >
                                         <Button variant="ghost" size="sm" className="text-amber-600 hover:text-amber-700">
                                             <Flag className="h-4 w-4" />
                                         </Button>
