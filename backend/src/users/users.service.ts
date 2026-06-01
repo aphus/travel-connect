@@ -44,6 +44,16 @@ export class UsersService {
     });
   }
 
+  async getTopTrustedLeaders(limit: number = 5) {
+    const leaders = await this.usersRepository.find({
+      where: { is_banned: false },
+      order: { trust_score: 'DESC', tripsCreated: 'DESC' },
+      take: limit,
+      select: ['id', 'full_name', 'avatar_url', 'trust_score', 'tripsCreated'],
+    });
+    return leaders;
+  }
+
   async findById(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {
