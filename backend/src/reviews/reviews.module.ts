@@ -6,11 +6,12 @@ import { TripMember } from '../trips/entities/trip_member.entity';
 import { User } from '../users/entities/user.entity';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Review, Trip, TripMember, User])],
+  imports: [TypeOrmModule.forFeature([Review, Trip, TripMember, User]), NotificationsModule],
   controllers: [ReviewsController],
   providers: [ReviewsService],
   exports: [ReviewsService],
 })
-export class ReviewsModule {}
+export class ReviewsModule { }

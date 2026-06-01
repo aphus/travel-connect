@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CalendarDays, MapPin, Star } from "lucide-react";
 import type { UserReview } from "@/services/reviews";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type UserReviewsProps = {
     reviews: UserReview[];
@@ -39,9 +40,16 @@ export default function UserReviews({ reviews }: UserReviewsProps) {
                                 {/* THÔNG TIN NGƯỜI ĐÁNH GIÁ */}
                                 <div className="flex items-center justify-between">
                                     <Link href={`/profile/${review.reviewer.id}`} className="flex items-center gap-4 group">
-                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white shadow-sm transition-transform group-hover:scale-105">
-                                            {getInitials(review.reviewer.fullName)}
-                                        </div>
+                                        <Avatar className="h-12 w-12 shrink-0 shadow-sm transition-transform group-hover:scale-105 border-2 border-transparent group-hover:border-slate-200">
+                                            <AvatarImage
+                                                src={review.reviewer.avatarUrl || ""}
+                                                alt={review.reviewer.fullName}
+                                                className="object-cover"
+                                            />
+                                            <AvatarFallback className="bg-slate-900 text-sm font-bold text-white">
+                                                {getInitials(review.reviewer.fullName)}
+                                            </AvatarFallback>
+                                        </Avatar>
                                         <div>
                                             <h4 className="text-base font-bold text-slate-900 group-hover:text-slate-700 transition-colors">
                                                 {review.reviewer.fullName}

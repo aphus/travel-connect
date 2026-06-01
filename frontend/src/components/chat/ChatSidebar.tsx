@@ -222,6 +222,6 @@ function tripToChatRoom(trip: Trip): ChatRoom {
         title: getTripTitle(trip),
         subtitle: `${trip.destination} • ${trip.currentMembers}/${trip.maxMembers} thành viên`,
         meta: trip.startDate ? formatDisplayDate(trip.startDate) : "Chuyến đi",
-        avatarUrl: trip.leader?.avatarUrl ?? "",
+        avatarUrl: trip.coverUrl ?? "",
     };
 }

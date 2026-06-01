@@ -16,7 +16,7 @@ import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { useSocket } from "@/contexts/SocketProvider";
 import api from "@/services/api";
 import { getAccessToken } from "@/services/fetchWrapper";
-import { getTrip } from "@/services/trips";
+import { getTrip, getTripTitle } from "@/services/trips";
 import ChatMenu from "@/components/chat/ChatMenu";
 
 
@@ -110,7 +110,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
     return memberId === currentUser;
   });
 
-  const roomTitle = "Phòng chat nhóm";
+  const roomTitle = trip ? getTripTitle(trip) : "Phòng chat nhóm";
   const isTripClosed = isClosedTripStatus(tripStatus);
 
   useEffect(() => {
@@ -215,13 +215,20 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
       <div className="p-4 border-b border-slate-200 bg-white flex justify-between items-center z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
+            <AvatarImage
+              src={trip?.coverUrl || "/images/default-cover.jpg"}
+              alt={roomTitle}
+              className="object-cover"
+            />
             <AvatarFallback className="bg-blue-600 text-white font-bold">
               {roomTitle.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
             <h2 className="font-bold text-slate-800">{roomTitle}</h2>
-            <p className="text-xs text-slate-500">3 thành viên</p>
+            <p className="text-xs text-slate-500">
+              {trip ? `${trip.currentMembers}/${trip.maxMembers} thành viên` : "Đang tải..."}
+            </p>
           </div>
         </div>
         <ChatMenu

@@ -12,7 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { clearAccessToken, getAccessToken } from "@/services/fetchWrapper";
 import { getCurrentUser, getStoredAuthUser, storeAuthUser, type AuthUser } from "@/services/auth";
 import { getUserInitials } from "@/lib/user";
@@ -272,6 +272,11 @@ export default function SmartHeader() {
                                     <button className="flex items-center gap-3 bg-white hover:bg-slate-50 border border-slate-300 pl-4 pr-1.5 py-1.5 rounded-full shadow-sm transition-all">
                                         <Menu className="h-5 w-5 text-slate-700" />
                                         <Avatar className="h-8 w-8 border-0 rounded-full">
+                                            <AvatarImage
+                                                src={currentUser?.avatarUrl || ""}
+                                                alt={currentUser?.fullName || "Avatar"}
+                                                className="object-cover"
+                                            />
                                             <AvatarFallback className="bg-slate-800 text-white font-bold rounded-full text-xs">
                                                 {getUserInitials(currentUser)}
                                             </AvatarFallback>

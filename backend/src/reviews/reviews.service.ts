@@ -12,6 +12,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { Trip, TripStatus } from '../trips/entities/trip.entity';
 import { TripMember } from '../trips/entities/trip_member.entity';
 import { User } from '../users/entities/user.entity';
+import { NotificationType, NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ReviewsService {
@@ -24,7 +25,9 @@ export class ReviewsService {
     private readonly tripMembersRepository: Repository<TripMember>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-  ) {}
+
+    private readonly notificationsService: NotificationsService,
+  ) { }
 
   async create(reviewerId: string, dto: CreateReviewDto) {
     if (reviewerId === dto.reviewee_id) {
@@ -85,6 +88,15 @@ export class ReviewsService {
 
     const savedReview = await this.saveReview(review);
     await this.recalculateTrustScore(dto.reviewee_id);
+
+    await this.notificationsService.create({
+      userId: dto.reviewee_id,
+      type: NotificationType.NEW_REVIEW,
+      title: 'Bạn có đánh giá mới',
+      message: `Một thành viên trong chuyến đi ${trip.destination} vừa để lại đánh giá cho bạn.`,
+      targetUrl: `/profile`,
+      metadata: { tripId: trip.id, reviewId: savedReview.id },
+    });
 
     return savedReview;
   }
