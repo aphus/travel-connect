@@ -18,7 +18,7 @@ export class AdminService {
     private readonly reportsRepository: Repository<Report>,
     private readonly usersService: UsersService,
     private readonly tripsService: TripsService,
-  ) {}
+  ) { }
 
   listUsers() {
     return this.usersRepository.find({
@@ -39,12 +39,14 @@ export class AdminService {
   listTrips() {
     return this.tripsRepository.find({
       order: { createdAt: 'DESC' },
+      relations: ['members', 'members.user'],
     });
   }
 
   listReports() {
     return this.reportsRepository.find({
       order: { created_at: 'DESC' },
+      relations: ['reporter', 'reported', 'trip'],
     });
   }
 
