@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Star } from "lucide-react";
 import type { UserReview } from "@/services/reviews";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import RatingStars from "@/components/review/RatingStars";
 
 type UserReviewsProps = {
     reviews: UserReview[];
@@ -19,15 +20,15 @@ export default function UserReviews({ reviews }: UserReviewsProps) {
         <div className="w-full">
             {/* --- HEADER TỔNG QUAN --- */}
             <div className="flex items-center gap-3 mb-8 border-b border-slate-200 pb-4">
-                <Star className="h-7 w-7 fill-slate-900 text-slate-900" />
+                <Star className="h-7 w-7 fill-amber-400 text-amber-400" />
                 <h2 className="text-2xl font-bold text-slate-900">
                     {reviews.length > 0 ? `${averageRating} · ${reviews.length} đánh giá` : "Chưa có đánh giá"}
                 </h2>
             </div>
 
             {reviews.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-12 flex flex-col items-center justify-center text-slate-500 text-center">
-                    <Star className="h-12 w-12 text-slate-300 mb-4" />
+                <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 p-12 flex flex-col items-center justify-center text-slate-500 text-center">
+                    <Star className="h-12 w-12 fill-amber-100 text-amber-300 mb-4" />
                     <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có nhận xét</h3>
                     <p className="text-sm">Thành viên này chưa nhận được đánh giá nào.</p>
                 </div>
@@ -64,14 +65,7 @@ export default function UserReviews({ reviews }: UserReviewsProps) {
 
                                 {/* RATING & CHUYẾN ĐI */}
                                 <div className="flex flex-wrap items-center gap-3">
-                                    <div className="flex items-center gap-0.5">
-                                        {Array.from({ length: 5 }).map((_, index) => (
-                                            <Star
-                                                key={index}
-                                                className={`h-4 w-4 ${index < review.rating ? "fill-slate-900 text-slate-900" : "fill-slate-100 text-slate-200"}`}
-                                            />
-                                        ))}
-                                    </div>
+                                    <RatingStars rating={review.rating} starClassName="h-4 w-4" />
 
                                     {review.trip && (
                                         <Link

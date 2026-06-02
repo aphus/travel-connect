@@ -47,8 +47,8 @@ export default function TripCompletionAction({ tripId, initialStatus, isLeader, 
         setError("");
 
         try {
-            await markTripCompleted(tripId);
-            setStatus("AWAITING_CONFIRMATION");
+            const result = await markTripCompleted(tripId);
+            setStatus(result.status === "completed" ? "COMPLETED" : "AWAITING_CONFIRMATION");
             setIsOpen(false);
             onCompleted?.();
         } catch (completeError) {

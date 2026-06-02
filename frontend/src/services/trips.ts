@@ -10,6 +10,7 @@ import { fetchWrapper } from "./fetchWrapper";
 export type TripStatus =
   | "upcoming"
   | "ongoing"
+  | "awaiting_confirmation"
   | "completed"
   | "cancelled";
 
@@ -41,7 +42,13 @@ export type Trip = {
   coverUrl?: string | null;
 };
 
-export type JoinStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELED";
+export type JoinStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELED"
+  | "REMOVED"
+  | "LEFT";
 
 export type TripRelation = {
   isLeader: boolean;
@@ -251,6 +258,22 @@ export async function getMyJoinedTrips() {
   return trips.map(normalizeTrip);
 }
 
+export async function getUserCreatedTrips(userId: string) {
+  const trips = await fetchWrapper<RawTrip[]>(
+    `/trips/users/${userId}/created`,
+    { auth: false },
+  );
+  return trips.map(normalizeTrip);
+}
+
+export async function getUserJoinedTrips(userId: string) {
+  const trips = await fetchWrapper<RawTrip[]>(
+    `/trips/users/${userId}/joined`,
+    { auth: false },
+  );
+  return trips.map(normalizeTrip);
+}
+
 export async function cancelTrip(id: string) {
   const trip = await fetchWrapper<RawTrip>(`/trips/${id}/cancel`, {
     method: "DELETE",
@@ -353,6 +376,9 @@ export function tripToCardData(trip: Trip): TripCardData {
       avatarUrl: trip.leader?.avatarUrl ?? undefined,
       trustScore: trip.leader?.trustScore ?? 0,
     },
+    joinStatus: trip.joinStatus,
+    status: trip.status,
+    leaderMarkedCompleted: trip.leaderMarkedCompleted,
   };
 }
 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import type { JoinStatus } from '@/services/trips';
 
 // 1. Định nghĩa cấu trúc dữ liệu (Props) mà thẻ này sẽ nhận vào
 export interface Trip {
@@ -22,6 +23,9 @@ export interface Trip {
         avatarUrl?: string;
         trustScore: number;
     };
+    status?: string;
+    joinStatus?: JoinStatus;
+    leaderMarkedCompleted?: boolean;
 }
 
 interface TripCardProps {
@@ -31,6 +35,8 @@ interface TripCardProps {
 export default function TripCard({ trip }: TripCardProps) {
     // Logic kiểm tra nhóm đã đủ người chưa
     const isFull = trip.currentMembers >= trip.maxMembers;
+    const isCompleted = trip.status === 'completed';
+    const joinButtonMeta = getJoinButtonMeta(trip.joinStatus, isFull, isCompleted);
 
     return (
         <Link href={`/trips/${trip.id}`} className="block h-full cursor-pointer hover:-translate-y-1 transition-transform duration-300">
@@ -63,7 +69,9 @@ export default function TripCard({ trip }: TripCardProps) {
                                 <div className="bg-orange-50 p-1.5 rounded-md"><Users className="w-4 h-4 text-orange-600" /></div>
                                 <span>{trip.currentMembers} / {trip.maxMembers} thành viên</span>
                             </div>
-                            {isFull && <Badge variant="destructive" className="text-[10px]">Đã đủ người</Badge>}
+                            {isFull && !isCompleted && (
+                                <Badge variant="destructive" className="text-[10px]">Đã đủ người</Badge>
+                            )}
                         </div>
                     </div>
                 </CardContent>
@@ -79,12 +87,80 @@ export default function TripCard({ trip }: TripCardProps) {
                             <span className="text-xs font-medium text-slate-500">Trust Score: <span className="text-blue-600">{trip.leader.trustScore}</span></span>
                         </div>
                     </div>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 font-semibold" disabled={isFull}>
-                        {isFull ? "Đã chốt" : "Tham gia"}
+                    <Button size="sm" className={joinButtonMeta.className} disabled={joinButtonMeta.disabled}>
+                        {joinButtonMeta.label}
                     </Button>
                 </CardFooter>
 
             </Card>
         </Link>
     );
+}
+
+function getJoinButtonMeta(
+    joinStatus: JoinStatus | undefined,
+    isFull: boolean,
+    isCompleted: boolean,
+) {
+    if (joinStatus === "REJECTED") {
+        return {
+            disabled: true,
+            label: "Bị từ chối",
+            className: "border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-50 font-semibold opacity-100 cursor-not-allowed",
+        };
+    }
+
+    if (joinStatus === "REMOVED") {
+        return {
+            disabled: true,
+            label: "Đã bị xóa",
+            className: "border border-red-200 bg-red-50 text-red-600 hover:bg-red-50 font-semibold opacity-100 cursor-not-allowed",
+        };
+    }
+
+    if (joinStatus === "LEFT") {
+        return {
+            disabled: true,
+            label: "Đã rời nhóm",
+            className: "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-50 font-semibold opacity-100 cursor-not-allowed",
+        };
+    }
+
+    if (joinStatus === "PENDING") {
+        return {
+            disabled: true,
+            label: "Đang chờ",
+            className: "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50 font-semibold opacity-100 cursor-default",
+        };
+    }
+
+    if (joinStatus === "APPROVED") {
+        return {
+            disabled: true,
+            label: "Đã tham gia",
+            className: "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 font-semibold opacity-100 cursor-default",
+        };
+    }
+
+    if (isCompleted) {
+        return {
+            disabled: true,
+            label: "Đã hoàn thành",
+            className: "bg-slate-100 text-slate-500 hover:bg-slate-100 font-semibold opacity-100 cursor-default",
+        };
+    }
+
+    if (isFull) {
+        return {
+            disabled: true,
+            label: "Đã chốt",
+            className: "bg-slate-100 text-slate-500 hover:bg-slate-100 font-semibold opacity-100 cursor-default",
+        };
+    }
+
+    return {
+        disabled: false,
+        label: "Tham gia",
+        className: "bg-blue-600 hover:bg-blue-700 font-semibold",
+    };
 }

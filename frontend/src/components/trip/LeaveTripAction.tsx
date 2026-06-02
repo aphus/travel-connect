@@ -49,12 +49,12 @@ export default function LeaveTripAction({ tripId, status, onSuccess, children }:
             <AlertDialogContent className="bg-white">
                 <AlertDialogHeader>
                     <AlertDialogTitle>
-                        {status === "PENDING" ? "Rút lại đơn xin tham gia?" : "Rời khỏi chuyến đi này?"}
+                        {status === "PENDING" ? "Rút lại đơn xin tham gia?" : "Rời nhóm chuyến đi này?"}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         {status === "PENDING"
                             ? "Đơn của bạn sẽ bị hủy bỏ và Leader sẽ không nhìn thấy yêu cầu của bạn nữa."
-                            : "Bạn sẽ không thể xem nội dung Chat và phải xin Leader duyệt lại nếu muốn quay lại."}
+                            : "Sau khi rời nhóm, bạn sẽ mất quyền xem chat và không thể xin tham gia lại chuyến đi này. Hãy chắc chắn trước khi xác nhận."}
                     </AlertDialogDescription>
                     {error && (
                         <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
@@ -70,7 +70,7 @@ export default function LeaveTripAction({ tripId, status, onSuccess, children }:
                         className="bg-red-600 hover:bg-red-700 text-white"
                     >
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Xác nhận
+                        {status === "PENDING" ? "Xác nhận" : "Rời nhóm"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

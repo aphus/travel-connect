@@ -14,7 +14,8 @@ import {
     parseCurrencyInput,
     parsePositiveIntegerInput,
 } from "@/lib/trip-format";
-import { listTrips, tripToCardData, type Trip } from "@/services/trips";
+import { getMyJoinedTrips, listTrips, tripToCardData, type Trip } from "@/services/trips";
+import { getAccessToken } from "@/services/fetchWrapper";
 
 function getQueryValue(params: URLSearchParams, primary: string, fallback?: string) {
     return params.get(primary) || (fallback ? params.get(fallback) : "") || "";
@@ -157,9 +158,22 @@ function FeedContent() {
                     budget: getQueryValue(params, "budget"),
                     maxMembers: getQueryValue(params, "maxMembers", "members"),
                 });
+                let tripsWithJoinStatus = result;
+
+                if (getAccessToken()) {
+                    const joinedTrips = await getMyJoinedTrips().catch(() => [] as Trip[]);
+                    const joinStatusByTripId = new Map(
+                        joinedTrips.map((trip) => [trip.id, trip.joinStatus]),
+                    );
+
+                    tripsWithJoinStatus = result.map((trip) => ({
+                        ...trip,
+                        joinStatus: joinStatusByTripId.get(trip.id) ?? trip.joinStatus,
+                    }));
+                }
 
                 if (isActive) {
-                    setTrips(result);
+                    setTrips(tripsWithJoinStatus);
                 }
             } catch (loadError) {
                 if (isActive) {

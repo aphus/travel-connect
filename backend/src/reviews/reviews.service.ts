@@ -9,7 +9,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Review } from './entities/review.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { Trip, TripStatus } from '../trips/entities/trip.entity';
+import {
+  normalizeTripStatus,
+  Trip,
+  TripStatus,
+} from '../trips/entities/trip.entity';
 import { TripMember } from '../trips/entities/trip_member.entity';
 import { User } from '../users/entities/user.entity';
 import { NotificationType, NotificationsService } from '../notifications/notifications.service';
@@ -29,6 +33,33 @@ export class ReviewsService {
     private readonly notificationsService: NotificationsService,
   ) { }
 
+  private getTodayDateString() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private async syncReviewableTripStatus(trip: Trip) {
+    const status = normalizeTripStatus(trip.status);
+    const canAutoComplete = [
+      TripStatus.UPCOMING,
+      TripStatus.ONGOING,
+      TripStatus.AWAITING_CONFIRMATION,
+    ].includes(status);
+
+    if (canAutoComplete && trip.endDate < this.getTodayDateString()) {
+      await this.tripsRepository.update(trip.id, {
+        status: TripStatus.COMPLETED,
+      });
+      trip.status = TripStatus.COMPLETED;
+    }
+
+    return trip;
+  }
+
   async create(reviewerId: string, dto: CreateReviewDto) {
     if (reviewerId === dto.reviewee_id) {
       throw new BadRequestException('Users cannot review themselves');
@@ -40,6 +71,8 @@ export class ReviewsService {
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
+
+    await this.syncReviewableTripStatus(trip);
 
     if (trip.status !== TripStatus.COMPLETED) {
       throw new BadRequestException(

@@ -205,7 +205,7 @@ function mergeTripsForChat(createdTrips: Trip[], joinedTrips: Trip[]) {
 }
 
 function isApprovedJoinedTrip(trip: Trip) {
-    return !["PENDING", "REJECTED", "CANCELED"].includes(trip.joinStatus ?? "");
+    return !["PENDING", "REJECTED", "CANCELED", "REMOVED", "LEFT"].includes(trip.joinStatus ?? "");
 }
 
 function sortTripsForChat(left: Trip, right: Trip) {

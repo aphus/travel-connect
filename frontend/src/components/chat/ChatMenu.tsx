@@ -60,7 +60,11 @@ export default function ChatMenu({
                 </DropdownMenuItem>
 
                 {/* Nút Báo cáo */}
-                <ReportUserDialog targetUserId={leaderId} targetUserName="Leader chuyến đi">
+                <ReportUserDialog
+                    tripId={tripId}
+                    targetUserId={leaderId}
+                    targetUserName="Leader chuyến đi"
+                >
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer font-semibold text-amber-600 focus:text-amber-700">
                         <Flag className="mr-2 h-4 w-4" /> Báo cáo chuyến đi
                     </DropdownMenuItem>
