@@ -132,6 +132,11 @@ export default function TripActionPanel({
 
   const canJoin = status === "UPCOMING";
   const canManageBeforeTrip = status === "UPCOMING";
+  const shouldShowJoinStatus =
+    joinStatus === "PENDING" ||
+    joinStatus === "REJECTED" ||
+    joinStatus === "REMOVED" ||
+    joinStatus === "LEFT";
   const canLeaderComplete =
     status === "UPCOMING" || status === "ONGOING" || status === "AWAITING_CONFIRMATION";
   const canRate = status === "COMPLETED";
@@ -178,6 +183,7 @@ export default function TripActionPanel({
 
         {isMember && leader.id && (
           <ReportUserDialog
+            tripId={trip.id}
             targetUserId={leader.id}
             targetUserName={leader.name}
           >
@@ -310,7 +316,7 @@ export default function TripActionPanel({
 
         {!isLeader &&
           !isMember &&
-          (canJoin ? (
+          (canJoin || shouldShowJoinStatus ? (
             <JoinTripButton
               tripId={trip.id}
               initialStatus={joinStatus ?? "NONE"}

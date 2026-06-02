@@ -19,6 +19,24 @@ export type UserReview = {
   } | null;
 };
 
+export type TripReview = {
+  id: string;
+  tripId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  reviewer: {
+    id: string;
+    fullName: string;
+    avatarUrl: string | null;
+  };
+  reviewee: {
+    id: string;
+    fullName: string;
+    avatarUrl: string | null;
+  };
+};
+
 export type CreateReviewPayload = {
   tripId: string;
   revieweeId: string;
@@ -51,6 +69,16 @@ type RawUserReview = {
   } | null;
 };
 
+type RawTripReview = RawUserReview & {
+  reviewee?: {
+    id: string;
+    full_name?: string;
+    fullName?: string;
+    avatar_url?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+};
+
 export async function createReview(payload: CreateReviewPayload) {
   return fetchWrapper("/reviews", {
     method: "POST",
@@ -67,6 +95,12 @@ export async function getUserReviews(userId: string) {
   const reviews = await fetchWrapper<RawUserReview[]>(`/reviews/users/${userId}`);
 
   return reviews.map(normalizeUserReview);
+}
+
+export async function getTripReviews(tripId: string) {
+  const reviews = await fetchWrapper<RawTripReview[]>(`/reviews/trips/${tripId}`);
+
+  return reviews.map(normalizeTripReview);
 }
 
 function normalizeUserReview(review: RawUserReview): UserReview {
@@ -92,5 +126,31 @@ function normalizeUserReview(review: RawUserReview): UserReview {
           endDate: review.trip.endDate ?? review.trip.end_date ?? "",
         }
       : null,
+  };
+}
+
+function normalizeTripReview(review: RawTripReview): TripReview {
+  return {
+    id: review.id,
+    tripId: review.tripId ?? review.trip_id ?? "",
+    rating: Number(review.rating),
+    comment: review.comment ?? null,
+    createdAt: review.createdAt ?? review.created_at ?? "",
+    reviewer: {
+      id: review.reviewer?.id ?? "",
+      fullName:
+        review.reviewer?.fullName ??
+        review.reviewer?.full_name ??
+        "Thành viên TripConnect",
+      avatarUrl: review.reviewer?.avatarUrl ?? review.reviewer?.avatar_url ?? null,
+    },
+    reviewee: {
+      id: review.reviewee?.id ?? "",
+      fullName:
+        review.reviewee?.fullName ??
+        review.reviewee?.full_name ??
+        "Thành viên TripConnect",
+      avatarUrl: review.reviewee?.avatarUrl ?? review.reviewee?.avatar_url ?? null,
+    },
   };
 }

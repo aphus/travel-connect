@@ -6,11 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-    CheckCircle,
     FolderPlus,
     Loader2,
-    Mail,
-    Star,
     Award,
     MapPin,
     Calendar,
@@ -42,6 +39,7 @@ import {
 import { ApiError } from "@/services/fetchWrapper";
 import { getUserInitials } from "@/lib/user";
 import UserReviews from "@/components/review/UserReviews";
+import RatingStars from "@/components/review/RatingStars";
 import { getUserReviews, type UserReview } from "@/services/reviews";
 import { uploadImage } from "@/services/auth";
 
@@ -63,11 +61,15 @@ export default function EnhancedProfilePage() {
 
     // STATE MỚI: Chứa danh sách chuyến đi
     const [upcomingTrips, setUpcomingTrips] = useState<Trip[]>([]);
+    const [tripsCompletedCount, setTripsCompletedCount] = useState<number>(0);
+    const [tripsCreatedCount, setTripsCreatedCount] = useState<number>(0);
+    const [createdTripsList, setCreatedTripsList] = useState<Trip[]>([]);
+    const [completedTripsList, setCompletedTripsList] = useState<Trip[]>([]);
 
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [statusMessage, setStatusMessage] = useState("");
 
-    const [activeTab, setActiveTab] = useState<"about" | "upcoming" | "reviews">("about");
+    const [activeTab, setActiveTab] = useState<"about" | "upcoming" | "reviews" | "created" | "completed">("about");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -130,19 +132,26 @@ export default function EnhancedProfilePage() {
                         getMyJoinedTrips()
                     ]);
 
-                    if (isMounted) {
-                        setReviews(userReviews);
+                        if (isMounted) {
+                            setReviews(userReviews);
 
-                        // Gộp chuyến đi, lọc trùng lặp và chỉ lấy chuyến Upcoming/Ongoing
-                        const allTrips = [...createdTrips, ...joinedTrips];
-                        const uniqueTrips = Array.from(new Map(allTrips.map(trip => [trip.id, trip])).values());
+                            // Gộp chuyến đi, lọc trùng lặp và tính toán thống kê
+                            const allTrips = [...createdTrips, ...joinedTrips];
+                            const uniqueTrips = Array.from(new Map(allTrips.map(trip => [trip.id, trip])).values());
 
-                        const upcoming = uniqueTrips
-                            .filter(trip => trip.status === "upcoming" || trip.status === "ongoing")
-                            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+                            const upcoming = uniqueTrips
+                                .filter(trip => trip.status === "upcoming" || trip.status === "ongoing")
+                                .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-                        setUpcomingTrips(upcoming);
-                    }
+                            const completedCount = uniqueTrips.filter(trip => trip.status === "completed").length;
+                            const createdCount = createdTrips.length;
+
+                            setUpcomingTrips(upcoming);
+                            setTripsCompletedCount(completedCount);
+                            setTripsCreatedCount(createdCount);
+                            setCreatedTripsList(createdTrips);
+                            setCompletedTripsList(uniqueTrips.filter(trip => trip.status === "completed"));
+                        }
                 } catch {
                     if (isMounted) {
                         setReviews([]);
@@ -206,12 +215,12 @@ export default function EnhancedProfilePage() {
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
                 {/* --- KHỐI AVATAR MỚI (CÓ NÚT UPLOAD) --- */}
                 <div className="relative group shrink-0">
-                    <Avatar className="h-32 w-32 md:h-40 md:w-40 border-[6px] border-slate-50 shadow-sm rounded-full overflow-hidden">
+                    <Avatar className="h-32 w-32 md:h-40 md:w-40 border-[6px] border-blue-50 shadow-sm rounded-full overflow-hidden">
                         <AvatarImage
                             src={currentUser?.avatarUrl || ""}
                             className="object-cover w-full h-full"
                         />
-                        <AvatarFallback className="bg-slate-800 text-white text-4xl font-bold rounded-full">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-600 to-sky-500 text-white text-4xl font-bold rounded-full">
                             {getUserInitials(currentUser)}
                         </AvatarFallback>
                     </Avatar>
@@ -241,18 +250,18 @@ export default function EnhancedProfilePage() {
                         <h1 className="text-3xl font-bold text-slate-900">
                             {currentUser?.fullName ?? "TripConnect User"}
                         </h1>
-                        <span className="flex items-center gap-1.5 bg-slate-800 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                        <span className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm shadow-blue-100">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Verified
                         </span>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-slate-600 mb-4">
                         <span className="flex items-center gap-1.5">
-                            <MapPin className="h-4 w-4" /> Vietnam
+                            <MapPin className="h-4 w-4 text-sky-600" /> Vietnam
                         </span>
                         <span className="hidden md:inline text-slate-300">•</span>
                         <span className="flex items-center gap-1.5">
-                            <Calendar className="h-4 w-4" /> Thành viên từ 2026
+                            <Calendar className="h-4 w-4 text-indigo-600" /> Thành viên từ 2026
                         </span>
                     </div>
                 </div>
@@ -301,31 +310,31 @@ export default function EnhancedProfilePage() {
 
             {/* --- THỐNG KÊ --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-                <Card className="border-slate-200 shadow-sm">
+                <Card className="border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab('reviews')}>
                     <CardContent className="p-6 flex flex-col items-center justify-center">
-                        <div className="flex gap-1 mb-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <Star key={star} className="h-5 w-5 fill-slate-800 text-slate-800" />
-                            ))}
+                        <RatingStars rating={trustScore} className="mb-2" starClassName="h-6 w-6" />
+                        <span className="text-3xl font-bold text-amber-950 mb-1">{displayTrustScore}</span>
+                        <span className="text-xs text-amber-700 uppercase tracking-wider font-semibold">Average Rating</span>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab('completed')}>
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                            <Award className="h-6 w-6" />
                         </div>
-                        <span className="text-3xl font-bold text-slate-900 mb-1">{displayTrustScore}</span>
-                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Average Rating</span>
+                        <span className="text-3xl font-bold text-emerald-950 mb-1">{tripsCompletedCount}</span>
+                        <span className="text-xs text-emerald-700 uppercase tracking-wider font-semibold">Trips Completed</span>
                     </CardContent>
                 </Card>
 
-                <Card className="border-slate-200 shadow-sm">
+                <Card className="border-blue-200 bg-gradient-to-br from-blue-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab('created')}>
                     <CardContent className="p-6 flex flex-col items-center justify-center">
-                        <Award className="h-6 w-6 text-slate-400 mb-3" />
-                        <span className="text-3xl font-bold text-slate-900 mb-1">0</span>
-                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Trips Completed</span>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-slate-200 shadow-sm">
-                    <CardContent className="p-6 flex flex-col items-center justify-center">
-                        <MapPin className="h-6 w-6 text-slate-400 mb-3" />
-                        <span className="text-3xl font-bold text-slate-900 mb-1">{currentUser?.tripsCreated ?? 0}</span>
-                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Trips Created</span>
+                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                            <FolderPlus className="h-6 w-6" />
+                        </div>
+                        <span className="text-3xl font-bold text-blue-950 mb-1">{tripsCreatedCount ?? currentUser?.tripsCreated ?? 0}</span>
+                        <span className="text-xs text-blue-700 uppercase tracking-wider font-semibold">Trips Created</span>
                     </CardContent>
                 </Card>
             </div>
@@ -344,12 +353,7 @@ export default function EnhancedProfilePage() {
                 >
                     Sắp tới {upcomingTrips.length > 0 && `(${upcomingTrips.length})`}
                 </button>
-                <button
-                    onClick={() => setActiveTab("reviews")}
-                    className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "reviews" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
-                >
-                    Đánh giá ({reviews.length})
-                </button>
+                {/* Reviews tab removed — accessible via clicking the rating card above */}
             </div>
 
             {/* --- TABS CONTENT --- */}
@@ -389,10 +393,50 @@ export default function EnhancedProfilePage() {
                     </div>
                 )}
 
-                {/* TAB: ĐÁNH GIÁ */}
+                {/* TAB: ĐÁNH GIÁ (kích hoạt khi bấm vào thẻ điểm) */}
                 {activeTab === "reviews" && (
                     <div className="animate-in fade-in duration-300">
                         <UserReviews reviews={reviews} />
+                    </div>
+                )}
+
+                {/* TAB: CHUYẾN ĐÃ TẠO */}
+                {activeTab === "created" && (
+                    <div className="animate-in fade-in duration-300">
+                        {createdTripsList.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {createdTripsList.map((trip) => (
+                                    <TripCard key={trip.id} trip={tripToCardData(trip)} />
+                                ))}
+                            </div>
+                        ) : (
+                            <Card className="border-slate-200 shadow-sm border-dashed">
+                                <CardContent className="p-16 flex flex-col items-center justify-center text-slate-500 text-center">
+                                    <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có chuyến nào được tạo</h3>
+                                    <p className="text-sm">Người dùng chưa tạo chuyến nào.</p>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
+
+                {/* TAB: CHUYẾN ĐÃ HOÀN THÀNH */}
+                {activeTab === "completed" && (
+                    <div className="animate-in fade-in duration-300">
+                        {completedTripsList.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {completedTripsList.map((trip) => (
+                                    <TripCard key={trip.id} trip={tripToCardData(trip)} />
+                                ))}
+                            </div>
+                        ) : (
+                            <Card className="border-slate-200 shadow-sm border-dashed">
+                                <CardContent className="p-16 flex flex-col items-center justify-center text-slate-500 text-center">
+                                    <h3 className="text-lg font-bold text-slate-700 mb-1">Chưa có chuyến đã hoàn thành</h3>
+                                    <p className="text-sm">Người dùng chưa hoàn thành chuyến nào.</p>
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
                 )}
             </div>

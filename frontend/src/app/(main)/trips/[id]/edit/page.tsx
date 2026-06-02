@@ -247,7 +247,7 @@ export default function EditTripPage() {
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="budget" className="font-semibold text-slate-700">
-                                        Ngân sách / người
+                                        Ngân sách dự kiến
                                     </Label>
                                     <div className="relative">
                                         <DollarSign className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />

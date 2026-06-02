@@ -3,7 +3,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
@@ -42,15 +45,45 @@ const VIETNAMESE_SEARCH_CHARS =
   'ÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬáàảãạăắằẳẵặâấầẩẫậÉÈẺẼẸÊẾỀỂỄỆéèẻẽẹêếềểễệÍÌỈĨỊíìỉĩịÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢóòỏõọôốồổỗộơớờởỡợÚÙỦŨỤƯỨỪỬỮỰúùủũụưứừửữựÝỲỶỸỴýỳỷỹỵĐđ';
 const VIETNAMESE_SEARCH_REPLACEMENTS =
   'AAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaaaaEEEEEEEEEEEeeeeeeeeeeeIIIIIiiiiiOOOOOOOOOOOOOOOOOoooooooooooooooooUUUUUUUUUUUuuuuuuuuuuuYYYYYyyyyyDd';
+const LEFT_TRIP_MESSAGE = '__TRIPCONNECT_LEFT_TRIP__';
+const TRIP_STATUS_SYNC_INTERVAL_MS = 60 * 60 * 1000;
 
 @Injectable()
-export class TripsService {
+export class TripsService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(TripsService.name);
+  private tripStatusSyncTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     @InjectRepository(Trip)
     private readonly tripsRepository: Repository<Trip>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) { }
+
+  onModuleInit() {
+    this.runScheduledTripStatusSync();
+    this.tripStatusSyncTimer = setInterval(
+      () => this.runScheduledTripStatusSync(),
+      TRIP_STATUS_SYNC_INTERVAL_MS,
+    );
+    this.tripStatusSyncTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.tripStatusSyncTimer) {
+      clearInterval(this.tripStatusSyncTimer);
+      this.tripStatusSyncTimer = null;
+    }
+  }
+
+  private runScheduledTripStatusSync() {
+    void this.syncAllTripStatusesByDate().catch((error: unknown) => {
+      this.logger.error(
+        'Không thể đồng bộ trạng thái chuyến đi theo ngày',
+        error instanceof Error ? error.stack : String(error),
+      );
+    });
+  }
 
   private validateTripDates(startDate: string, endDate: string) {
     if (startDate > endDate) {
@@ -83,6 +116,39 @@ export class TripsService {
     return trip.startDate <= this.getTodayDateString();
   }
 
+  private hasTripCompletionGracePeriodExpired(trip: Pick<Trip, 'endDate'>) {
+    return trip.endDate < this.getTodayDateString();
+  }
+
+  private shouldAutoCompleteTrip(trip: Pick<Trip, 'status' | 'endDate'>) {
+    const status = normalizeTripStatus(trip.status);
+
+    return (
+      [
+        TripStatus.UPCOMING,
+        TripStatus.ONGOING,
+        TripStatus.AWAITING_CONFIRMATION,
+      ].includes(status) && this.hasTripCompletionGracePeriodExpired(trip)
+    );
+  }
+
+  private async syncAutoCompletedTrips() {
+    await this.tripsRepository
+      .createQueryBuilder()
+      .update(Trip)
+      .set({ status: TripStatus.COMPLETED })
+      .where('status IN (:...statuses)', {
+        statuses: [
+          TripStatus.UPCOMING,
+          TripStatus.ONGOING,
+          TripStatus.LEGACY_IN_PROGRESS,
+          TripStatus.AWAITING_CONFIRMATION,
+        ],
+      })
+      .andWhere('end_date < :today', { today: this.getTodayDateString() })
+      .execute();
+  }
+
   private async syncStartedUpcomingTrips() {
     await this.tripsRepository
       .createQueryBuilder()
@@ -93,13 +159,50 @@ export class TripsService {
       .execute();
   }
 
+  private async syncAllTripStatusesByDate() {
+    await this.syncAutoCompletedTrips();
+    await this.syncStartedUpcomingTrips();
+  }
+
   private async syncTripStatusByDate(trip: Trip) {
-    if (trip.status !== TripStatus.UPCOMING || !this.hasTripStarted(trip)) {
+    if (this.shouldAutoCompleteTrip(trip)) {
+      await this.tripsRepository.update(trip.id, {
+        status: TripStatus.COMPLETED,
+      });
+      trip.status = TripStatus.COMPLETED;
+
       return trip;
+    }
+
+    if (trip.status !== TripStatus.UPCOMING || !this.hasTripStarted(trip)) {
+      return this.syncTripCompletionStatus(trip);
     }
 
     await this.tripsRepository.update(trip.id, { status: TripStatus.ONGOING });
     trip.status = TripStatus.ONGOING;
+
+    return this.syncTripCompletionStatus(trip);
+  }
+
+  private async syncTripCompletionStatus(trip: Trip) {
+    if (trip.status !== TripStatus.AWAITING_CONFIRMATION) {
+      return trip;
+    }
+
+    const activeMemberCount = await this.dataSource
+      .getRepository(TripMember)
+      .createQueryBuilder('member')
+      .where('member.trip_id = :tripId', { tripId: trip.id })
+      .andWhere('member.user_id != :leaderId', { leaderId: trip.leaderId })
+      .getCount();
+
+    if (activeMemberCount === 0) {
+      await this.tripsRepository.update(trip.id, {
+        status: TripStatus.COMPLETED,
+        leaderMarkedCompleted: true,
+      });
+      trip.status = TripStatus.COMPLETED;
+    }
 
     return trip;
   }
@@ -179,6 +282,22 @@ export class TripsService {
       pendingRequests: stats.pendingRequests,
       ...extra,
     };
+  }
+
+  private toJoinStatus(request: JoinRequest, userId?: string) {
+    if (request.status === RequestStatus.CANCELED && request.processedBy) {
+      if (request.message === LEFT_TRIP_MESSAGE || (userId && request.processedBy.id === userId)) {
+        return 'LEFT';
+      }
+
+      return 'REMOVED';
+    }
+
+    if (request.status === RequestStatus.CANCELED && request.message === LEFT_TRIP_MESSAGE) {
+      return 'LEFT';
+    }
+
+    return request.status;
   }
 
   private async loadTripStats(tripIds: string[]) {
@@ -351,7 +470,7 @@ export class TripsService {
   }
 
   async findAll(filters: FilterTripsDto) {
-    await this.syncStartedUpcomingTrips();
+    await this.syncAllTripStatusesByDate();
 
     const qb = this.createPublicTripsQuery();
     const status = normalizeTripStatus(filters.status ?? TripStatus.UPCOMING);
@@ -467,6 +586,8 @@ export class TripsService {
   }
 
   async getTrendingDestinations(limit: number = 5) {
+    await this.syncAllTripStatusesByDate();
+
     const trending = await this.tripsRepository
       .createQueryBuilder('trip')
       .select('trip.destination', 'destination')
@@ -512,7 +633,7 @@ export class TripsService {
   }
 
   async findCreatedByLeader(userId: string) {
-    await this.syncStartedUpcomingTrips();
+    await this.syncAllTripStatusesByDate();
 
     const trips = await this.createPublicTripsQuery()
       .where('trip.leader_id = :userId', { userId })
@@ -530,7 +651,7 @@ export class TripsService {
   }
 
   async findJoinedByUser(userId: string) {
-    await this.syncStartedUpcomingTrips();
+    await this.syncAllTripStatusesByDate();
 
     const memberships = await this.dataSource
       .getRepository(TripMember)
@@ -565,10 +686,24 @@ export class TripsService {
       .createQueryBuilder('request')
       .innerJoinAndSelect('request.trip', 'trip')
       .leftJoinAndSelect('trip.leader', 'leader')
+      .leftJoinAndSelect('request.processedBy', 'processedBy')
       .where('request.user_id = :userId', { userId })
-      .andWhere('request.status IN (:...statuses)', {
-        statuses: [RequestStatus.PENDING, RequestStatus.REJECTED],
-      })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.status IN (:...visibleStatuses)', {
+            visibleStatuses: [RequestStatus.PENDING, RequestStatus.REJECTED],
+          }).orWhere(
+            'request.status = :canceledStatus AND request.processed_by IS NOT NULL',
+            { canceledStatus: RequestStatus.CANCELED },
+          ).orWhere(
+            'request.status = :canceledStatus AND request.message = :leftMessage',
+            {
+              canceledStatus: RequestStatus.CANCELED,
+              leftMessage: LEFT_TRIP_MESSAGE,
+            },
+          );
+        }),
+      )
       .orderBy('request.created_at', 'DESC')
       .getMany();
     await this.syncTripsStatusByDate(
@@ -588,11 +723,44 @@ export class TripsService {
           currentMembers: 1,
           pendingRequests: 0,
         },
-        { joinStatus: request.status },
+        { joinStatus: this.toJoinStatus(request, userId) },
       ),
     );
 
     return [...joinedTrips, ...requestTrips];
+  }
+
+  async findPublicJoinedByUser(userId: string) {
+    await this.syncAllTripStatusesByDate();
+
+    const memberships = await this.dataSource
+      .getRepository(TripMember)
+      .createQueryBuilder('member')
+      .innerJoinAndSelect('member.trip', 'trip')
+      .leftJoinAndSelect('trip.leader', 'leader')
+      .where('member.user_id = :userId', { userId })
+      .andWhere('member.role = :role', { role: MemberRole.MEMBER })
+      .orderBy('member.joined_at', 'DESC')
+      .getMany();
+
+    await this.syncTripsStatusByDate(
+      memberships.map((membership) => membership.trip),
+    );
+
+    const stats = await this.loadTripStats(
+      memberships.map((membership) => membership.trip.id),
+    );
+
+    return memberships.map((membership) =>
+      this.toPublicTripWithStats(
+        membership.trip,
+        stats.get(membership.trip.id) ?? {
+          currentMembers: 1,
+          pendingRequests: 0,
+        },
+        { joinStatus: RequestStatus.APPROVED },
+      ),
+    );
   }
 
   async findRelation(tripId: string, userId: string) {
@@ -618,6 +786,75 @@ export class TripsService {
         isLeader: false,
         isMember: true,
         joinStatus: RequestStatus.APPROVED,
+      };
+    }
+
+    const leftRequest = await this.dataSource
+      .getRepository(JoinRequest)
+      .createQueryBuilder('request')
+      .where('request.trip_id = :tripId', { tripId })
+      .andWhere('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.CANCELED })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.processed_by = :userId', { userId }).orWhere(
+            'request.message = :leftMessage',
+            { leftMessage: LEFT_TRIP_MESSAGE },
+          );
+        }),
+      )
+      .orderBy('request.created_at', 'DESC')
+      .getOne();
+
+    if (leftRequest) {
+      return {
+        isLeader: false,
+        isMember: false,
+        joinStatus: 'LEFT',
+      };
+    }
+
+    const removedRequest = await this.dataSource
+      .getRepository(JoinRequest)
+      .createQueryBuilder('request')
+      .where('request.trip_id = :tripId', { tripId })
+      .andWhere('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.CANCELED })
+      .andWhere('request.processed_by IS NOT NULL')
+      .andWhere('request.processed_by != :userId', { userId })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.message IS NULL').orWhere(
+            'request.message != :leftMessage',
+            { leftMessage: LEFT_TRIP_MESSAGE },
+          );
+        }),
+      )
+      .orderBy('request.created_at', 'DESC')
+      .getOne();
+
+    if (removedRequest) {
+      return {
+        isLeader: false,
+        isMember: false,
+        joinStatus: 'REMOVED',
+      };
+    }
+
+    const rejectedRequest = await this.dataSource
+      .getRepository(JoinRequest)
+      .createQueryBuilder('request')
+      .where('request.trip_id = :tripId', { tripId })
+      .andWhere('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.REJECTED })
+      .orderBy('request.created_at', 'DESC')
+      .getOne();
+
+    if (rejectedRequest) {
+      return {
+        isLeader: false,
+        isMember: false,
+        joinStatus: RequestStatus.REJECTED,
       };
     }
 
@@ -706,6 +943,7 @@ export class TripsService {
       throw new BadRequestException('Bạn là leader của chuyến đi này');
     }
 
+    await this.syncTripStatusByDate(trip);
     this.validateTripIsBookable(trip);
 
     const stats = await this.loadTripStats([tripId]);
@@ -724,6 +962,66 @@ export class TripsService {
 
     if (member) {
       throw new ConflictException('Bạn đã tham gia chuyến đi này');
+    }
+
+    const leftRequest = await joinRequestRepository
+      .createQueryBuilder('request')
+      .where('request.trip_id = :tripId', { tripId })
+      .andWhere('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.CANCELED })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.processed_by = :userId', { userId }).orWhere(
+            'request.message = :leftMessage',
+            { leftMessage: LEFT_TRIP_MESSAGE },
+          );
+        }),
+      )
+      .orderBy('request.created_at', 'DESC')
+      .getOne();
+
+    if (leftRequest) {
+      throw new BadRequestException(
+        'Bạn đã tự rời nhóm của chuyến đi này. Bạn không thể xin tham gia lại, hãy tìm chuyến đi khác.',
+      );
+    }
+
+    const removedRequest = await joinRequestRepository
+      .createQueryBuilder('request')
+      .where('request.trip_id = :tripId', { tripId })
+      .andWhere('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.CANCELED })
+      .andWhere('request.processed_by IS NOT NULL')
+      .andWhere('request.processed_by != :userId', { userId })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.message IS NULL').orWhere(
+            'request.message != :leftMessage',
+            { leftMessage: LEFT_TRIP_MESSAGE },
+          );
+        }),
+      )
+      .orderBy('request.created_at', 'DESC')
+      .getOne();
+
+    if (removedRequest) {
+      throw new BadRequestException(
+        'Bạn đã bị leader xóa khỏi nhóm của chuyến đi này. Bạn không thể xin tham gia lại.',
+      );
+    }
+
+    const rejectedRequest = await joinRequestRepository
+      .createQueryBuilder('request')
+      .where('request.trip_id = :tripId', { tripId })
+      .andWhere('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.REJECTED })
+      .orderBy('request.created_at', 'DESC')
+      .getOne();
+
+    if (rejectedRequest) {
+      throw new BadRequestException(
+        'Yêu cầu tham gia chuyến đi này đã bị leader từ chối. Bạn không thể xin tham gia lại.',
+      );
     }
 
     const existingActiveRequest = await joinRequestRepository
@@ -996,18 +1294,20 @@ export class TripsService {
 
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(TripMember).delete({ id: member.id });
-      await manager
+      const approvedRequest = await manager
         .getRepository(JoinRequest)
         .createQueryBuilder()
-        .update(JoinRequest)
-        .set({
-          status: RequestStatus.CANCELED,
-          processed_at: new Date(),
-        })
         .where('trip_id = :tripId', { tripId })
         .andWhere('user_id = :memberUserId', { memberUserId })
         .andWhere('status = :status', { status: RequestStatus.APPROVED })
-        .execute();
+        .getOne();
+
+      if (approvedRequest) {
+        approvedRequest.status = RequestStatus.CANCELED;
+        approvedRequest.processedBy = { id: leaderId } as User;
+        approvedRequest.processed_at = new Date();
+        await manager.getRepository(JoinRequest).save(approvedRequest);
+      }
     });
 
     await this.notificationsService.create({
@@ -1036,6 +1336,7 @@ export class TripsService {
     const member = await this.dataSource
       .getRepository(TripMember)
       .createQueryBuilder('member')
+      .innerJoinAndSelect('member.user', 'user')
       .where('member.trip_id = :tripId', { tripId })
       .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.role = :role', { role: MemberRole.MEMBER })
@@ -1047,15 +1348,34 @@ export class TripsService {
 
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(TripMember).delete({ id: member.id });
-      await manager
+      const approvedRequest = await manager
         .getRepository(JoinRequest)
         .createQueryBuilder()
-        .update(JoinRequest)
-        .set({ status: RequestStatus.CANCELED, processed_at: new Date() })
         .where('trip_id = :tripId', { tripId })
         .andWhere('user_id = :userId', { userId })
         .andWhere('status = :status', { status: RequestStatus.APPROVED })
-        .execute();
+        .getOne();
+
+      if (approvedRequest) {
+        approvedRequest.status = RequestStatus.CANCELED;
+        approvedRequest.processedBy = { id: userId } as User;
+        approvedRequest.processed_at = new Date();
+        approvedRequest.message = LEFT_TRIP_MESSAGE;
+        await manager.getRepository(JoinRequest).save(approvedRequest);
+      }
+    });
+
+    await this.notificationsService.create({
+      userId: trip.leaderId,
+      type: NotificationType.TRIP_MEMBER_REMOVED,
+      title: 'Thành viên đã rời chuyến đi',
+      message: `${member.user.full_name} đã rời nhóm của chuyến đi ${trip.destination}.`,
+      targetUrl: `/trips/manage?tab=created&tripId=${trip.id}`,
+      metadata: {
+        tripId: trip.id,
+        memberUserId: userId,
+        action: 'LEFT',
+      },
     });
 
     return { success: true };
@@ -1127,8 +1447,25 @@ export class TripsService {
       );
     }
 
+    const activeMemberCount = await this.dataSource
+      .getRepository(TripMember)
+      .createQueryBuilder('member')
+      .where('member.trip_id = :tripId', { tripId })
+      .andWhere('member.user_id != :leaderId', { leaderId: userId })
+      .getCount();
+
+    if (activeMemberCount === 0) {
+      await this.tripsRepository.update(tripId, {
+        status: TripStatus.COMPLETED,
+        leaderMarkedCompleted: true,
+      });
+
+      return this.findOne(tripId);
+    }
+
     await this.tripsRepository.update(tripId, {
       status: TripStatus.AWAITING_CONFIRMATION,
+      leaderMarkedCompleted: true,
     });
 
     const members = await this.dataSource

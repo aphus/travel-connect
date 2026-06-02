@@ -284,6 +284,7 @@ export default function ChatWindow({ tripId }: ChatWindowProps) {
                 {!isMe && (
                   <div className="absolute -bottom-6 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     <ReportUserDialog
+                      tripId={tripId}
                       targetUserId={msg.senderId}
                       targetUserName={msg.senderName}
                     >

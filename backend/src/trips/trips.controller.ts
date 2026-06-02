@@ -46,6 +46,18 @@ export class TripsController {
   }
 
   @Public()
+  @Get('users/:userId/created')
+  findUserCreatedTrips(@Param('userId') userId: string) {
+    return this.tripsService.findCreatedByLeader(userId);
+  }
+
+  @Public()
+  @Get('users/:userId/joined')
+  findUserJoinedTrips(@Param('userId') userId: string) {
+    return this.tripsService.findPublicJoinedByUser(userId);
+  }
+
+  @Public()
   @Get('trending/destinations')
   getTrendingDestinations() {
     return this.tripsService.getTrendingDestinations(5);

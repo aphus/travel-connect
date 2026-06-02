@@ -20,7 +20,11 @@ export default function JoinTripButton({ tripId, initialStatus = "NONE", onSucce
     const [error, setError] = useState("");
 
     useEffect(() => {
-        setStatus(initialStatus ?? "NONE");
+        const timeoutId = window.setTimeout(() => {
+            setStatus(initialStatus ?? "NONE");
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
     }, [initialStatus]);
 
     const handleJoinClick = async () => {
@@ -60,14 +64,50 @@ export default function JoinTripButton({ tripId, initialStatus = "NONE", onSucce
         );
     }
 
+    if (status === "REJECTED") {
+        return (
+            <div className="space-y-2">
+                <Button variant="outline" disabled className="w-full sm:w-auto text-rose-600 border-rose-200 bg-rose-50 opacity-100 font-bold cursor-not-allowed">
+                    <XCircle className="mr-2 h-5 w-5" />
+                    Không thể xin lại
+                </Button>
+                <p className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">
+                    Leader đã từ chối yêu cầu trước đó. Vui lòng tìm chuyến đi khác.
+                </p>
+            </div>
+        );
+    }
+
+    if (status === "REMOVED") {
+        return (
+            <div className="space-y-2">
+                <Button variant="outline" disabled className="w-full sm:w-auto text-red-600 border-red-200 bg-red-50 opacity-100 font-bold cursor-not-allowed">
+                    <XCircle className="mr-2 h-5 w-5" />
+                    Đã bị xóa khỏi nhóm
+                </Button>
+                <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                    Leader đã xóa bạn khỏi nhóm của chuyến đi này. Bạn không thể xin tham gia lại, hãy tìm chuyến đi khác.
+                </p>
+            </div>
+        );
+    }
+
+    if (status === "LEFT") {
+        return (
+            <div className="space-y-2">
+                <Button variant="outline" disabled className="w-full sm:w-auto text-slate-600 border-slate-200 bg-slate-50 opacity-100 font-bold cursor-not-allowed">
+                    <XCircle className="mr-2 h-5 w-5" />
+                    Đã rời nhóm
+                </Button>
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
+                    Bạn đã tự rời nhóm của chuyến đi này. Bạn không thể xin tham gia lại, hãy tìm chuyến đi khác.
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-2">
-            {status === "REJECTED" && (
-                <div className="flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">
-                    <XCircle className="h-4 w-4" />
-                    Yêu cầu trước đó chưa được duyệt
-                </div>
-            )}
             <Button
                 onClick={handleJoinClick}
                 disabled={isLoading}
