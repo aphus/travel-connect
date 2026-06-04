@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, UseGuards, Body } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -9,7 +9,7 @@ import { UserRole } from '../users/entities/user.entity';
 @Roles(UserRole.ADMIN)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('users')
   listUsers() {
@@ -17,7 +17,7 @@ export class AdminController {
   }
 
   @Patch('users/:id/ban')
-  banUser(@Param('id') id: string) {
+  banUser(@Param('id') id: string, @Body('days') days?: number) {
     return this.adminService.banUser(id);
   }
 

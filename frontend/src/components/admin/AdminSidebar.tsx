@@ -3,7 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Map, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Map, LogOut, AlertTriangle } from "lucide-react";
+
 
 export default function AdminSidebar() {
     const pathname = usePathname();
@@ -12,6 +13,7 @@ export default function AdminSidebar() {
         { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
         { name: "Quản lý Người dùng", href: "/admin/users", icon: Users },
         { name: "Quản lý Chuyến đi", href: "/admin/trips", icon: Map },
+        { name: "Quản lý Báo cáo", href: "/admin/reports", icon: AlertTriangle },
     ];
 
     return (

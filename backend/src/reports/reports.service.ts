@@ -29,7 +29,7 @@ export class ReportsService {
     private readonly tripMembersRepository: Repository<TripMember>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-  ) {}
+  ) { }
 
   async create(reporterId: string, dto: CreateReportDto) {
     if (reporterId === dto.reported_user_id) {
@@ -74,8 +74,27 @@ export class ReportsService {
     return this.reportsRepository.save(report);
   }
 
-  findAll() {
-    return this.findReports();
+  async findAll() {
+    const reports = await this.findReports();
+
+    const reportCountMap: Record<string, number> = {};
+    reports.forEach((r) => {
+      const reportedId = r.reported?.id;
+      if (reportedId) {
+        reportCountMap[reportedId] = (reportCountMap[reportedId] || 0) + 1;
+      }
+    });
+
+    return reports.map((r) => {
+      const reportedId = r.reported?.id;
+      const totalReports = reportedId ? reportCountMap[reportedId] : 0;
+
+      return {
+        ...r,
+        previousReportCount: Math.max(0, totalReports - 1),
+        accountStatus: (r.reported as any)?.is_banned ? 'BỊ KHÓA' : 'HOẠT ĐỘNG',
+      };
+    });
   }
 
   async findByTrip(tripId: string, user: AuthUser) {
@@ -181,6 +200,7 @@ export class ReportsService {
       full_name: true,
       avatar_url: true,
       role: true,
+      is_banned: true,
     },
     trip: {
       id: true,

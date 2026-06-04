@@ -88,4 +88,6 @@ export type AdminReport = {
     reporter?: { id: string; email: string; full_name?: string };
     reported?: { id: string; email: string; full_name?: string };
     trip?: { id: string; destination?: string };
+    previousReportCount?: number;
+    accountStatus?: string;
 };
