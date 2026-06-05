@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { JoinStatus } from '@/services/trips';
+import TripTrustRating from './TripTrustRating';
 
 // 1. Định nghĩa cấu trúc dữ liệu (Props) mà thẻ này sẽ nhận vào
 export interface Trip {
@@ -134,7 +135,7 @@ export default function TripCard({ trip, variant = "default" }: TripCardProps) {
                         </Avatar>
                         <div className="flex flex-col">
                             <span className="text-sm font-bold text-slate-900 leading-none mb-1">{trip.leader.name}</span>
-                            <span className="text-xs font-medium text-slate-500">Trust Score: <span className="text-blue-600">{trip.leader.trustScore}</span></span>
+                            <TripTrustRating value={trip.leader.trustScore} />
                         </div>
                     </div>
                     <Button size="sm" className={joinButtonMeta.className} disabled={joinButtonMeta.disabled}>

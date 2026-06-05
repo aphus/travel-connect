@@ -8,6 +8,7 @@ import RatingMemberSheet from "./RatingMemberSheet";
 import ManageMembersSheet from "./ManageMembersSheet";
 import LeaveTripAction from "./LeaveTripAction";
 import ApprovalSheet from "./ApprovalSheet";
+import TripTrustRating from "./TripTrustRating";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReportUserDialog from "@/components/report/ReportUserDialog";
@@ -175,10 +176,7 @@ export default function TripActionPanel({
 
         <div className="flex-1">
           <h4 className="font-bold text-slate-900 text-sm">{leader.name}</h4>
-          <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-slate-500">
-            <span>Trust Score:</span>
-            <span className="text-amber-500">{leader.trustScore}</span>
-          </div>
+          <TripTrustRating value={leader.trustScore} className="mt-1" />
         </div>
 
         {isMember && leader.id && (
@@ -216,12 +214,7 @@ export default function TripActionPanel({
                   <p className="truncate text-sm font-semibold text-slate-800">
                     {member.name}
                   </p>
-                  <p className="text-xs text-slate-500">
-                    Trust Score:{" "}
-                    <span className="text-amber-500 font-semibold">
-                      {member.trustScore}
-                    </span>
-                  </p>
+                  <TripTrustRating value={member.trustScore} />
                 </div>
               </div>
             ))}

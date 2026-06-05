@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, X, Star, Loader2 } from "lucide-react";
+import { Check, X, Loader2 } from "lucide-react";
 import {
     Sheet,
     SheetContent,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import TripTrustRating from "./TripTrustRating";
 import {
     approveTripJoinRequest,
     getTripJoinRequests,
@@ -116,11 +117,7 @@ export default function ApprovalSheet({ tripId, onChanged, children }: ApprovalS
                                         </Avatar>
                                         <div>
                                             <h4 className="font-bold text-slate-900 text-sm">{req.user.fullName}</h4>
-                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-500 mt-1">
-                                                <Star className="h-3.5 w-3.5 fill-amber-500" />
-                                                <span>{req.user.trustScore}</span>
-                                                <span className="text-slate-400 font-medium">Trust Score</span>
-                                            </div>
+                                            <TripTrustRating value={req.user.trustScore} className="mt-1" />
                                             {req.message && (
                                                 <p className="mt-1 max-w-[190px] text-xs text-slate-500 line-clamp-2">
                                                     {req.message}

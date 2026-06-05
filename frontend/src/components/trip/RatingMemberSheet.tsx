@@ -16,6 +16,7 @@ import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { getStoredAuthUser } from "@/services/auth";
 import { createReview, getTripReviews } from "@/services/reviews";
 import { getTripMembers, type TripMember } from "@/services/trips";
+import TripTrustRating from "./TripTrustRating";
 
 interface RatingMemberProps {
   children: React.ReactNode;
@@ -232,12 +233,7 @@ export default function RatingMemberSheet({
 
                     <div>
                       <h4 className="font-bold text-sm">{member.name}</h4>
-                      <p className="text-xs text-slate-500">
-                        Trust Score:{" "}
-                        <span className="text-amber-500 font-semibold">
-                          {member.trustScore}
-                        </span>
-                      </p>
+                      <TripTrustRating value={member.trustScore} />
                       {isAlreadyReviewed && (
                         <p className="mt-1 text-xs font-semibold text-emerald-600">
                           Đã đánh giá

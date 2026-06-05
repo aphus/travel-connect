@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Star, UserMinus, ShieldAlert, Users, Loader2 } from "lucide-react";
+import { UserMinus, ShieldAlert, Users, Loader2 } from "lucide-react";
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
@@ -13,6 +13,7 @@ import { getTripMembers, type TripMember } from "@/services/trips";
 import ReportUserDialog from "@/components/report/ReportUserDialog";
 import { Flag } from "lucide-react";
 import { getStoredAuthUser } from "@/services/auth";
+import TripTrustRating from "./TripTrustRating";
 
 type ManageMembersSheetProps = {
     tripId: string;
@@ -105,11 +106,7 @@ export default function ManageMembersSheet({ tripId, isLeader = false, onChanged
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-500 mt-1">
-                                            <Star className="h-3.5 w-3.5 fill-amber-500" />
-                                            <span>{member.trustScore}</span>
-                                            <span className="text-slate-400 font-medium">Trust Score</span>
-                                        </div>
+                                        <TripTrustRating value={member.trustScore} className="mt-1" />
                                     </div>
                                 </Link>
 
