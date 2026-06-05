@@ -38,9 +38,11 @@ import {
 
 import {
     getCurrentUser,
+    sendEmailOtp,
     sendPhoneOtp,
     storeAuthUser,
     updateCurrentUser,
+    verifyEmailOtp,
     verifyPhoneOtp,
     type AuthUser,
 } from "@/services/auth";
@@ -56,6 +58,7 @@ import { getMyCreatedTrips, getMyJoinedTrips, tripToCardData, type Trip } from "
 import TripCard from "@/components/trip/TripCard";
 
 const profileSchema = z.object({
+    email: z.string().email({ message: "Email không hợp lệ" }),
     name: z.string().min(2, { message: "Tên phải có ít nhất 2 ký tự" }),
     bio: z.string().optional(),
     phoneNumber: z.string().optional(),
@@ -72,6 +75,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 function getProfileFormDefaults(user: AuthUser): ProfileFormValues {
     return {
+        email: user.email,
         name: user.fullName,
         bio: user.bio || "",
         phoneNumber: user.phoneNumber || "",
@@ -95,6 +99,8 @@ function getProfileCompletion(user: AuthUser | null) {
     const criteria = [
         hasProfileValue(user.avatarUrl),
         hasProfileValue(user.fullName),
+        hasProfileValue(user.email),
+        Boolean(user.emailVerified),
         hasProfileValue(user.phoneNumber),
         Boolean(user.phoneVerified),
         hasProfileValue(user.dateOfBirth),
@@ -162,6 +168,13 @@ export default function EnhancedProfilePage() {
 
     const [activeTab, setActiveTab] = useState<"about" | "upcoming" | "reviews" | "created" | "completed">("about");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isEmailOtpOpen, setIsEmailOtpOpen] = useState(false);
+    const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
+    const [isVerifyingEmailOtp, setIsVerifyingEmailOtp] = useState(false);
+    const [emailOtpSent, setEmailOtpSent] = useState(false);
+    const [emailOtpCode, setEmailOtpCode] = useState("");
+    const [emailOtpMessage, setEmailOtpMessage] = useState("");
+    const [emailOtpError, setEmailOtpError] = useState("");
     const [isPhoneOtpOpen, setIsPhoneOtpOpen] = useState(false);
     const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -208,6 +221,7 @@ export default function EnhancedProfilePage() {
     } = useForm<ProfileFormValues>({
         resolver: zodResolver(profileSchema),
         defaultValues: {
+            email: "",
             name: "",
             bio: "",
             phoneNumber: "",
@@ -289,6 +303,7 @@ export default function EnhancedProfilePage() {
         setStatusMessage("");
         try {
             const updatedUser = await updateCurrentUser({
+                email: data.email.trim(),
                 fullName: data.name.trim(),
                 bio: data.bio,
                 phoneNumber: data.phoneNumber,
@@ -316,6 +331,64 @@ export default function EnhancedProfilePage() {
     const handleOpenChange = (open: boolean) => {
         setIsDialogOpen(open);
         if (!open) setStatusMessage("");
+    };
+
+    const resetEmailOtpState = () => {
+        setEmailOtpSent(false);
+        setEmailOtpCode("");
+        setEmailOtpMessage("");
+        setEmailOtpError("");
+    };
+
+    const handleEmailOtpOpenChange = (open: boolean) => {
+        setIsEmailOtpOpen(open);
+        resetEmailOtpState();
+    };
+
+    const handleSendEmailOtp = async () => {
+        const email = currentUser?.email?.trim();
+        if (!email) {
+            setEmailOtpError("Vui lòng cập nhật email trong hồ sơ trước.");
+            return;
+        }
+
+        setIsSendingEmailOtp(true);
+        setEmailOtpError("");
+        setEmailOtpMessage("");
+
+        try {
+            const result = await sendEmailOtp(email);
+            setEmailOtpSent(true);
+            setEmailOtpMessage(result.message);
+        } catch (error) {
+            setEmailOtpError(error instanceof ApiError ? error.message : "Không thể gửi OTP.");
+        } finally {
+            setIsSendingEmailOtp(false);
+        }
+    };
+
+    const handleVerifyEmailOtp = async () => {
+        const email = currentUser?.email?.trim();
+        if (!email) {
+            setEmailOtpError("Vui lòng cập nhật email trong hồ sơ trước.");
+            return;
+        }
+
+        setIsVerifyingEmailOtp(true);
+        setEmailOtpError("");
+
+        try {
+            const updatedUser = await verifyEmailOtp(email, emailOtpCode);
+            setCurrentUser(updatedUser);
+            storeAuthUser(updatedUser);
+            reset(getProfileFormDefaults(updatedUser));
+            setIsEmailOtpOpen(false);
+            resetEmailOtpState();
+        } catch (error) {
+            setEmailOtpError(error instanceof ApiError ? error.message : "Không thể xác minh OTP.");
+        } finally {
+            setIsVerifyingEmailOtp(false);
+        }
     };
 
     const resetPhoneOtpState = () => {
@@ -389,6 +462,13 @@ export default function EnhancedProfilePage() {
     const profileCompletion = getProfileCompletion(currentUser);
     const isProfileReady = Boolean(currentUser?.profileCompleted);
     const needsAvatarForProfile = !hasProfileValue(currentUser?.avatarUrl);
+    const email = currentUser?.email?.trim() ?? "";
+    const isEmailVerified = Boolean(email && currentUser?.emailVerified);
+    const emailStatusLabel = email
+        ? isEmailVerified
+            ? "Đã xác minh"
+            : "Chưa xác minh"
+        : "Chưa cập nhật";
     const phoneNumber = currentUser?.phoneNumber?.trim() ?? "";
     const isPhoneVerified = Boolean(phoneNumber && currentUser?.phoneVerified);
     const phoneStatusLabel = phoneNumber
@@ -511,8 +591,9 @@ export default function EnhancedProfilePage() {
                                     <Textarea id="travelPreferences" placeholder="Ví dụ: thích lịch trình rõ ràng, không hút thuốc, ưu tiên ngủ sớm..." rows={4} {...register("travelPreferences")} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-sm font-bold text-slate-700">Email (Không thể đổi)</Label>
-                                    <Input id="email" value={currentUser?.email ?? ""} disabled className="bg-slate-50 text-slate-500" />
+                                    <Label htmlFor="email" className="text-sm font-bold text-slate-700">Email đăng nhập</Label>
+                                    <Input id="email" type="email" className={errors.email ? "border-red-500" : ""} {...register("email")} />
+                                    {errors.email?.message && <p className="text-xs font-medium text-red-600">{errors.email.message}</p>}
                                 </div>
                                 {statusMessage && (
                                     <p className="rounded-md bg-red-50 border border-red-100 px-4 py-3 text-sm font-semibold text-red-700">
@@ -530,6 +611,72 @@ export default function EnhancedProfilePage() {
                     </Dialog>
                 </div>
             </div>
+
+            <Dialog open={isEmailOtpOpen} onOpenChange={handleEmailOtpOpenChange}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">Xác minh email</DialogTitle>
+                        <DialogDescription>
+                            Email này sẽ được dùng để đăng nhập trong lần sau. Nếu muốn đổi email, hãy cập nhật trong phần Cập nhật hồ sơ trước.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Email cần xác minh</p>
+                            <p className="mt-1 break-all text-sm font-semibold text-slate-800">
+                                {email || "Chưa cập nhật"}
+                            </p>
+                        </div>
+                        {!email && (
+                            <p className="rounded-md border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                                Vui lòng cập nhật email trong hồ sơ trước.
+                            </p>
+                        )}
+                        <Button
+                            type="button"
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white"
+                            onClick={handleSendEmailOtp}
+                            disabled={!email || isSendingEmailOtp}
+                        >
+                            {isSendingEmailOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang gửi...</> : "Gửi OTP"}
+                        </Button>
+                        {emailOtpSent && (
+                            <div className="space-y-2">
+                                <Label htmlFor="emailOtpCode" className="text-sm font-bold text-slate-700">Mã OTP</Label>
+                                <Input
+                                    id="emailOtpCode"
+                                    inputMode="numeric"
+                                    placeholder="Nhập mã OTP"
+                                    value={emailOtpCode}
+                                    onChange={(event) => setEmailOtpCode(event.target.value)}
+                                />
+                                <p className="text-xs font-medium text-slate-500">Mã OTP demo: 123456</p>
+                            </div>
+                        )}
+                        {emailOtpMessage && (
+                            <p className="rounded-md border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                                {emailOtpMessage}
+                            </p>
+                        )}
+                        {emailOtpError && (
+                            <p className="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                {emailOtpError}
+                            </p>
+                        )}
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                            <Button type="button" variant="ghost" onClick={() => setIsEmailOtpOpen(false)}>Hủy</Button>
+                            <Button
+                                type="button"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                onClick={handleVerifyEmailOtp}
+                                disabled={!emailOtpSent || !emailOtpCode.trim() || isVerifyingEmailOtp}
+                            >
+                                {isVerifyingEmailOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xác minh...</> : "Xác minh"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isPhoneOtpOpen} onOpenChange={handlePhoneOtpOpenChange}>
                 <DialogContent className="sm:max-w-[420px]">
@@ -669,7 +816,21 @@ export default function EnhancedProfilePage() {
                                     <TrustStatusItem
                                         icon={Mail}
                                         label="Email"
-                                        verified={Boolean(currentUser?.emailVerified)}
+                                        detail={email || "Chưa cập nhật"}
+                                        verified={isEmailVerified}
+                                        statusLabel={emailStatusLabel}
+                                        action={!isEmailVerified ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 rounded-full px-3 text-xs font-bold"
+                                                disabled={!email}
+                                                onClick={() => setIsEmailOtpOpen(true)}
+                                            >
+                                                Xác minh
+                                            </Button>
+                                        ) : null}
                                     />
                                     <TrustStatusItem
                                         icon={Phone}

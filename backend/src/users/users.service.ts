@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -13,6 +14,8 @@ import { JoinRequest, RequestStatus } from '../trips/entities/join_request.entit
 import { TripMember } from '../trips/entities/trip_member.entity';
 import { SendPhoneOtpDto } from './dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
+import { SendEmailOtpDto } from './dto/send-email-otp.dto';
+import { VerifyEmailOtpDto } from './dto/verify-email-otp.dto';
 
 type TripReliability = {
   completed_trips: number;
@@ -28,6 +31,7 @@ type TripReliability = {
 
 const LEFT_TRIP_MESSAGE = '__TRIPCONNECT_LEFT_TRIP__';
 const DEMO_PHONE_OTP = '123456';
+const DEMO_EMAIL_OTP = '123456';
 
 @Injectable()
 export class UsersService {
@@ -36,6 +40,7 @@ export class UsersService {
 
   toPrivateUser(user: User) {
     const profileCompleted = this.isProfileCompleted(user);
+    const emailVerified = Boolean(user.email?.trim() && user.email_verified);
     const phoneVerified = Boolean(user.phone_number?.trim() && user.phone_verified);
 
     return {
@@ -56,7 +61,7 @@ export class UsersService {
       emergency_contact_phone: user.emergency_contact_phone,
       travel_style: user.travel_style,
       travel_preferences: user.travel_preferences,
-      email_verified: user.email_verified,
+      email_verified: emailVerified,
       phone_verified: phoneVerified,
       identity_verified: user.identity_verified,
       profile_completed: profileCompleted,
@@ -68,6 +73,7 @@ export class UsersService {
 
   toPublicUser(user: User) {
     const profileCompleted = this.isProfileCompleted(user);
+    const emailVerified = Boolean(user.email?.trim() && user.email_verified);
     const phoneVerified = Boolean(user.phone_number?.trim() && user.phone_verified);
 
     return {
@@ -83,7 +89,7 @@ export class UsersService {
       gender: user.gender,
       travel_style: user.travel_style,
       travel_preferences: user.travel_preferences,
-      email_verified: user.email_verified,
+      email_verified: emailVerified,
       phone_verified: phoneVerified,
       identity_verified: user.identity_verified,
       profile_completed: profileCompleted,
@@ -149,6 +155,19 @@ export class UsersService {
     const current = await this.findById(userId);
     const updateData = this.buildProfileUpdateData(dto);
 
+    if (dto.email !== undefined) {
+      const nextEmail = this.normalizeOptionalString(dto.email);
+      if (!nextEmail) {
+        throw new BadRequestException('Vui lòng nhập email.');
+      }
+
+      if (nextEmail !== current.email) {
+        await this.assertEmailAvailableForUser(nextEmail, userId);
+        updateData.email = nextEmail;
+        updateData.email_verified = false;
+      }
+    }
+
     if (dto.phone_number !== undefined) {
       const nextPhoneNumber = this.normalizeOptionalString(dto.phone_number);
       if (nextPhoneNumber !== current.phone_number) {
@@ -171,6 +190,47 @@ export class UsersService {
     }
 
     return this.toPrivateUser(updated);
+  }
+
+  async sendEmailOtp(userId: string, dto: SendEmailOtpDto) {
+    this.assertOtpMockAvailable();
+    const email = this.normalizeOptionalString(dto.email);
+
+    if (!email) {
+      throw new BadRequestException('Vui lòng nhập email.');
+    }
+
+    await this.assertEmailAvailableForUser(email, userId);
+
+    return { message: 'Mã OTP đã được gửi.' };
+  }
+
+  async verifyEmailOtp(userId: string, dto: VerifyEmailOtpDto) {
+    this.assertOtpMockAvailable();
+    const email = this.normalizeOptionalString(dto.email);
+
+    if (!email) {
+      throw new BadRequestException('Vui lòng nhập email.');
+    }
+
+    await this.assertEmailAvailableForUser(email, userId);
+
+    if (dto.code?.trim() !== DEMO_EMAIL_OTP) {
+      throw new BadRequestException('Mã OTP không chính xác.');
+    }
+
+    const user = await this.findById(userId);
+    user.email = email;
+    user.email_verified = true;
+    user.profile_completed = this.isProfileCompleted(user);
+
+    await this.usersRepository.update(userId, {
+      email: user.email,
+      email_verified: user.email_verified,
+      profile_completed: user.profile_completed,
+    });
+
+    return this.toPrivateUser(user);
   }
 
   async sendPhoneOtp(dto: SendPhoneOtpDto) {
@@ -227,6 +287,8 @@ export class UsersService {
     return Boolean(
       user.full_name?.trim() &&
       user.avatar_url?.trim() &&
+      user.email?.trim() &&
+      user.email_verified &&
       user.phone_number?.trim() &&
       user.phone_verified &&
       user.date_of_birth &&
@@ -285,9 +347,19 @@ export class UsersService {
     return updateData as DeepPartial<User>;
   }
 
-  private normalizeOptionalString(value: string) {
+  private normalizeOptionalString(value?: string | null) {
+    if (value === undefined || value === null) return null;
+
     const trimmed = value.trim();
     return trimmed || null;
+  }
+
+  private async assertEmailAvailableForUser(email: string, userId: string) {
+    const existingUser = await this.findByEmail(email);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Email đã được sử dụng');
+    }
   }
 
   private assertOtpMockAvailable() {

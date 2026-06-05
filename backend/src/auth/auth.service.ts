@@ -60,6 +60,7 @@ export class AuthService {
         password_hash,
         full_name: dto.fullName,
         role: UserRole.USER,
+        email_verified: false,
       });
 
       return this.buildAuthResponse(user);

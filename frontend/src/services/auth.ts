@@ -68,6 +68,7 @@ export async function uploadImage(file: File) {
 }
 
 export async function updateCurrentUser(payload: {
+  email?: string;
   fullName?: string;
   bio?: string;
   avatarUrl?: string;
@@ -81,6 +82,7 @@ export async function updateCurrentUser(payload: {
   travelPreferences?: string | null;
 }) {
   const body: Record<string, string | null> = {};
+  if (payload.email !== undefined) body.email = payload.email;
   if (payload.fullName) body.full_name = payload.fullName;
   if (payload.bio !== undefined) body.bio = payload.bio;
   if (payload.avatarUrl !== undefined) {
@@ -120,6 +122,22 @@ export async function verifyPhoneOtp(phoneNumber: string, code: string) {
   const user = await fetchWrapper<RawAuthUser>("/users/me/phone/verify-otp", {
     method: "POST",
     body: JSON.stringify({ phone_number: phoneNumber, code }),
+  });
+
+  return normalizeAuthUser(user);
+}
+
+export function sendEmailOtp(email: string) {
+  return fetchWrapper<{ message: string }>("/users/me/email/send-otp", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyEmailOtp(email: string, code: string) {
+  const user = await fetchWrapper<RawAuthUser>("/users/me/email/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
   });
 
   return normalizeAuthUser(user);

@@ -70,7 +70,7 @@ export class User {
   @Column({ name: 'trips_created', type: 'int', default: 0 })
   tripsCreated!: number;
 
-  @Column({ default: true })
+  @Column({ default: false })
   email_verified!: boolean;
 
   @Column({ default: false })
