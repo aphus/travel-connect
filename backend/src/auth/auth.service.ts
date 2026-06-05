@@ -36,6 +36,12 @@ export class AuthService {
         role: user.role,
         trustScore: Number(user.trust_score),
         tripsCreated: user.tripsCreated,
+        profile_completed: user.profile_completed,
+        phone_verified: user.phone_verified,
+        email_verified: user.email_verified,
+        identity_verified: user.identity_verified,
+        city: user.city,
+        travel_style: user.travel_style,
       },
     };
   }
