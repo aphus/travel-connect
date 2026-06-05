@@ -11,6 +11,9 @@ export type AdminUser = {
     is_banned?: boolean;
     createdAt?: string;
     created_at?: string;
+    trust_score?: number;
+    tripsCreated?: number;
+    avatar_url?: string;
 };
 
 // 1. Lấy danh sách toàn bộ người dùng
@@ -41,6 +44,7 @@ export type AdminTrip = {
     description?: string;
     cost?: number;
     createdAt?: string;
+    maxMembers: number;
 
     members?: {
         id: string;
@@ -50,6 +54,7 @@ export type AdminTrip = {
             id: string;
             full_name?: string;
             email?: string;
+            avatar?: string;
         }
     }[];
 };
@@ -90,14 +95,21 @@ export type AdminReport = {
     created_at?: string;
     reporter?: { id: string; email: string; full_name?: string };
     reported?: { id: string; email: string; full_name?: string };
-    trip?: { id: string; destination?: string; destinationPlace?: string | null; destination_place?: string | null };
+    trip?: { id: string; destination?: string };
+    previousReportCount?: number;
+    accountStatus?: string;
+    admin_note?: string | null;
 };
 
-export function getAdminTripDestinationLabel(
-    trip: Pick<AdminTrip, "destination" | "destinationPlace" | "destination_place">,
-) {
-    return formatTripDestination(
-        trip.destination,
-        trip.destinationPlace ?? trip.destination_place ?? null,
-    );
+export const getUserTrips = async (userId: string) => {
+    return await fetchWrapper(`/admin/users/${userId}/trips`, {
+        method: 'GET',
+    });
+};
+
+export async function sendTripNotificationAsAdmin(tripId: string, payload: { type: string; message: string; broadcastToMembers: boolean }) {
+    return fetchWrapper<{ success: boolean; message: string; sentCount: number }>(`/admin/trips/${tripId}/notify`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
 }

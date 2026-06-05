@@ -80,8 +80,16 @@ export default function TripDetailsModal({ isOpen, onClose, trip }: TripDetailsM
                                     return (
                                         <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 uppercase font-bold text-sm">
-                                                    {member.user?.full_name?.charAt(0) || <User className="w-4 h-4" />}
+                                                <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 uppercase font-bold shrink-0 overflow-hidden">
+                                                    {member.user?.avatar ? (
+                                                        <img
+                                                            src={member.user.avatar}
+                                                            alt={member.user.full_name || 'Avatar'}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        member.user?.full_name?.charAt(0) || <User className="w-4 h-4" />
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-slate-800">

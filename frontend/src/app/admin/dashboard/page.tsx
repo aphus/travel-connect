@@ -13,7 +13,6 @@ import {
     type AdminUser,
 } from "@/services/admin";
 
-import ReportModal from "@/components/admin/dashboard/ReportModal";
 import DashboardChart from "@/components/admin/dashboard/DashboardChart";
 import RecentActivities, { Activity } from "@/components/admin/dashboard/RecentActivities";
 
@@ -24,7 +23,7 @@ export default function AdminDashboardPage() {
     const [reportsList, setReportsList] = useState<AdminReport[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
-    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isReportViewed, setIsReportViewed] = useState(false);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -40,10 +39,12 @@ export default function AdminDashboardPage() {
                 const safeTrips: AdminTrip[] = Array.isArray(trips) ? trips : [];
                 const safeReports: AdminReport[] = Array.isArray(reports) ? reports : [];
 
+                const pendingReports = safeReports.filter((r: any) => r.status !== 'resolved' && r.status !== 'rejected');
+
                 setStatsData({
                     users: safeUsers.length,
                     trips: safeTrips.length,
-                    reports: safeReports.length,
+                    reports: pendingReports.length,
                 });
                 setReportsList(safeReports);
 
@@ -99,7 +100,7 @@ export default function AdminDashboardPage() {
     const stats = [
         { title: "Tổng Người dùng", value: statsData.users, icon: Users, color: "text-blue-600", bg: "bg-blue-100", href: "/admin/users" },
         { title: "Tổng Chuyến đi", value: statsData.trips, icon: Map, color: "text-emerald-600", bg: "bg-emerald-100", href: "/admin/trips" },
-        { title: "Báo cáo vi phạm", value: statsData.reports, icon: AlertTriangle, color: "text-rose-600", bg: "bg-rose-100", isReport: true },
+        { title: "Báo cáo vi phạm", value: statsData.reports, icon: AlertTriangle, color: "text-rose-600", bg: "bg-rose-100", href: "/admin/reports", isReport: true },
         { title: "Lượt truy cập (Tuần)", value: "349", icon: TrendingUp, color: "text-violet-600", bg: "bg-violet-100" },
     ];
 
@@ -121,7 +122,7 @@ export default function AdminDashboardPage() {
                                     <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                                 </div>
                             )}
-                            {stat.isReport && statsData.reports > 0 && (
+                            {stat.isReport && statsData.reports > 0 && !isReportViewed && (
                                 <span className="absolute top-4 right-4 flex h-3 w-3">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
@@ -141,18 +142,16 @@ export default function AdminDashboardPage() {
 
                     if (stat.href) {
                         return (
-                            <Link href={stat.href} key={index} className="block focus:outline-none rounded-2xl">
+                            <Link
+                                href={stat.href} key={index}
+                                className="block focus:outline-none rounded-2xl"
+                                onClick={() => stat.isReport && setIsReportViewed(true)}
+                            >
                                 {CardContent}
                             </Link>
                         );
                     }
-                    if (stat.isReport) {
-                        return (
-                            <div key={index} onClick={() => setIsReportModalOpen(true)}>
-                                {CardContent}
-                            </div>
-                        );
-                    }
+
                     return <div key={index}>{CardContent}</div>;
                 })}
             </div>
@@ -162,11 +161,6 @@ export default function AdminDashboardPage() {
                 <RecentActivities isLoading={isLoading} activities={recentActivities} />
             </div>
 
-            <ReportModal
-                isOpen={isReportModalOpen}
-                onClose={() => setIsReportModalOpen(false)}
-                reportsList={reportsList}
-            />
         </div>
     );
 }

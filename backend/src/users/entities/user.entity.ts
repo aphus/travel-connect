@@ -37,6 +37,9 @@ export class User {
   @Column({ default: false })
   is_banned!: boolean;
 
+  @Column({ type: 'timestamp', nullable: true })
+  banned_until!: Date | null;
+
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
   trust_score!: number;
 
