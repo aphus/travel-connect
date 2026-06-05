@@ -36,6 +36,7 @@ export function registerUser(payload: {
   fullName: string;
   email: string;
   password: string;
+  acceptTerms: boolean;
 }) {
   return fetchWrapper<AuthResponse>("/auth/register", {
     method: "POST",
