@@ -42,6 +42,14 @@ export class ReviewsService {
     return `${year}-${month}-${day}`;
   }
 
+  private getTripDestinationLabel(
+    trip: Pick<Trip, 'destination' | 'destinationPlace'>,
+  ) {
+    return trip.destinationPlace
+      ? `${trip.destinationPlace}, ${trip.destination}`
+      : trip.destination;
+  }
+
   private async syncReviewableTripStatus(trip: Trip) {
     const status = normalizeTripStatus(trip.status);
     const canAutoComplete = [
@@ -126,7 +134,7 @@ export class ReviewsService {
       userId: dto.reviewee_id,
       type: NotificationType.NEW_REVIEW,
       title: 'Bạn có đánh giá mới',
-      message: `Một thành viên trong chuyến đi ${trip.destination} vừa để lại đánh giá cho bạn.`,
+      message: `Một thành viên trong chuyến đi ${this.getTripDestinationLabel(trip)} vừa để lại đánh giá cho bạn.`,
       targetUrl: `/profile`,
       metadata: { tripId: trip.id, reviewId: savedReview.id },
     });
@@ -155,6 +163,7 @@ export class ReviewsService {
         trip: {
           id: true,
           destination: true,
+          destinationPlace: true,
           startDate: true,
           endDate: true,
         },

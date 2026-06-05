@@ -16,6 +16,10 @@ export class FilterTripsDto {
   destination?: string;
 
   @IsOptional()
+  @IsString()
+  destinationPlace?: string;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 

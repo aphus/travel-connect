@@ -40,6 +40,7 @@ import { ApiError } from "@/services/fetchWrapper";
 import {
     getMyCreatedTrips,
     getMyJoinedTrips,
+    getTripDestinationLabel,
     getTripTitle,
     type JoinStatus,
     type Trip,
@@ -324,7 +325,7 @@ function ManageTripsContent() {
                                                                     {getTripTitle(trip)}
                                                                 </Link>
                                                                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 font-medium">
-                                                                    <span className="flex items-center gap-1.5"><MapPin className={`h-4 w-4 ${isCancelled ? "text-slate-400" : "text-orange-400"}`} /> {trip.destination}</span>
+                                                                    <span className="flex items-center gap-1.5"><MapPin className={`h-4 w-4 ${isCancelled ? "text-slate-400" : "text-orange-400"}`} /> {getTripDestinationLabel(trip)}</span>
                                                                     <span className="flex items-center gap-1.5"><Clock className={`h-4 w-4 ${isCancelled ? "text-slate-400" : "text-blue-400"}`} /> {formatDisplayDate(trip.startDate)}</span>
                                                                 </div>
                                                             </TableCell>

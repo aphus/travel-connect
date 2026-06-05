@@ -16,9 +16,8 @@ export default function AdminTripsPage() {
     const [selectedTrip, setSelectedTrip] = useState<AdminTrip | null>(null);
     const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
 
-    useEffect(() => {
-        loadTrips();
-    }, []);
+    async function loadTrips() {
+        await Promise.resolve();
 
     const handleExecuteSendNotification = async (payload: { type: string, message: string, broadcastToMembers: boolean }) => {
         if (!selectedTrip) return;
@@ -43,7 +42,15 @@ export default function AdminTripsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            void loadTrips();
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
+    }, []);
 
     // Lọc dữ liệu kết hợp Tìm kiếm & Trạng thái
     const filteredTrips = trips.filter(trip => {

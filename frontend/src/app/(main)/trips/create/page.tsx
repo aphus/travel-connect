@@ -2,27 +2,10 @@
 
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { MapPin, DollarSign, Users, Type, AlignLeft, Loader2, ImagePlus, Compass, X } from "lucide-react";
-import { Controller } from "react-hook-form";
-
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
+import { DollarSign, Users, Type, AlignLeft, Loader2, ImagePlus, Compass, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,27 +25,18 @@ import {
     parseCurrencyInput,
     parsePositiveIntegerInput,
 } from "@/lib/trip-format";
+import { OTHER_DESTINATION_OPTION, resolveTripDestinationPlace } from "@/lib/vietnam-destinations";
 import { setAuthFlash } from "@/services/auth";
 import { createTrip } from "@/services/trips";
 import { ApiError } from "@/services/fetchWrapper";
-
-const VIETNAM_PROVINCES = [
-    "An Giang", "Bà Rịa - Vũng Tàu", "Bạc Liêu", "Bắc Giang", "Bắc Kạn", "Bắc Ninh",
-    "Bến Tre", "Bình Dương", "Bình Định", "Bình Phước", "Bình Thuận", "Cà Mau",
-    "Cao Bằng", "Cần Thơ", "Đà Nẵng", "Đắk Lắk", "Đắk Nông", "Điện Biên", "Đồng Nai",
-    "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Nội", "Hà Tĩnh", "Hải Dương",
-    "Hải Phòng", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Hồ Chí Minh", "Khánh Hòa",
-    "Kiên Giang", "Kon Tum", "Lai Châu", "Lạng Sơn", "Lào Cai", "Lâm Đồng", "Long An",
-    "Nam Định", "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình",
-    "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La",
-    "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang",
-    "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
-];
+import { TripDestinationPicker } from "@/components/trip/TripDestinationPicker";
 
 // Zod Schema
 const createTripSchema = z.object({
     title: z.string().min(10, { message: "Tên chuyến đi cần ít nhất 10 ký tự" }),
-    location: z.string().min(2, { message: "Vui lòng nhập địa điểm" }),
+    province: z.string().min(2, { message: "Vui lòng chọn tỉnh/thành phố" }),
+    destinationPlace: z.string().min(2, { message: "Vui lòng chọn điểm đến cụ thể" }),
+    customDestination: z.string().optional(),
     budget: z.string()
         .min(1, { message: "Vui lòng nhập ngân sách" })
         .refine((value) => {
@@ -88,6 +62,13 @@ const createTripSchema = z.object({
 }, {
     message: "Ngày về phải bằng hoặc sau ngày đi",
     path: ["endDate"],
+}).refine((data) => {
+    if (data.destinationPlace !== OTHER_DESTINATION_OPTION) return true;
+
+    return (data.customDestination ?? "").trim().length >= 2;
+}, {
+    message: "Vui lòng nhập điểm đến khác",
+    path: ["customDestination"],
 });
 
 type CreateTripFormValues = z.infer<typeof createTripSchema>;
@@ -95,7 +76,6 @@ type CreateTripFormValues = z.infer<typeof createTripSchema>;
 export default function CreateTripPage() {
     const router = useRouter();
     const [submitError, setSubmitError] = useState("");
-    const [openLocation, setOpenLocation] = useState(false);
 
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -105,13 +85,28 @@ export default function CreateTripPage() {
     const {
         register,
         handleSubmit,
-        watch,
+        setValue,
+        clearErrors,
+        control,
         formState: { errors, isSubmitting },
-        control
     } = useForm<CreateTripFormValues>({
         resolver: zodResolver(createTripSchema),
+        defaultValues: {
+            title: "",
+            province: "",
+            destinationPlace: "",
+            customDestination: "",
+            budget: "",
+            maxMembers: "",
+            description: "",
+            startDate: "",
+            endDate: "",
+        },
     });
-    const selectedStartDate = watch("startDate");
+    const selectedStartDate = useWatch({ control, name: "startDate" });
+    const selectedProvince = useWatch({ control, name: "province" });
+    const selectedDestinationPlace = useWatch({ control, name: "destinationPlace" });
+    const customDestination = useWatch({ control, name: "customDestination" }) ?? "";
 
     const handleImageClick = () => {
         fileInputRef.current?.click();
@@ -181,8 +176,14 @@ export default function CreateTripPage() {
             }
 
             // 2. Gửi dữ liệu tạo chuyến đi (kèm link ảnh) xuống backend
+            const destinationPlace = resolveTripDestinationPlace(
+                data.destinationPlace,
+                data.customDestination,
+            );
+
             const trip = await createTrip({
-                destination: data.location.trim(),
+                destination: data.province.trim(),
+                destinationPlace,
                 startDate: data.startDate,
                 endDate: data.endDate,
                 budget,
@@ -249,76 +250,30 @@ export default function CreateTripPage() {
                                     {errors.title && <p className="text-sm text-red-500 font-medium">{errors.title.message}</p>}
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="location" className="font-semibold text-slate-700 flex items-center gap-2">
-                                        Địa điểm đến <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Controller
-                                        control={control}
-                                        name="location"
-                                        render={({ field }) => (
-                                            <Popover open={openLocation} onOpenChange={setOpenLocation}>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        role="combobox"
-                                                        aria-expanded={openLocation}
-                                                        className={cn(
-                                                            "w-full justify-between h-12 bg-slate-50 border-slate-200 text-base font-normal hover:bg-white",
-                                                            !field.value && "text-slate-500",
-                                                            errors.location && "border-red-500"
-                                                        )}
-                                                    >
-                                                        <div className="flex items-center">
-                                                            <MapPin className="mr-2 h-5 w-5 text-slate-400" />
-                                                            {field.value ? field.value : "Chọn tỉnh/thành phố bạn muốn đến..."}
-                                                        </div>
-                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                    </Button>
-                                                </PopoverTrigger>
-
-                                                {/* Dùng var(--radix-popover-trigger-width) để menu thả xuống RỘNG BẰNG ĐÚNG cái nút bấm */}
-                                                <PopoverContent
-                                                    className="p-0"
-                                                    style={{ width: "var(--radix-popover-trigger-width)" }}
-                                                    align="start"
-                                                >
-                                                    <Command>
-                                                        <CommandInput placeholder="Gõ tên tỉnh/thành phố..." />
-                                                        <CommandList className="max-h-[250px]">
-                                                            <CommandEmpty>Không tìm thấy địa điểm nào.</CommandEmpty>
-                                                            <CommandGroup>
-                                                                {VIETNAM_PROVINCES.map((province) => (
-                                                                    <CommandItem
-                                                                        key={province}
-                                                                        value={province}
-                                                                        onSelect={() => {
-                                                                            field.onChange(province); // Lưu dữ liệu
-                                                                            setOpenLocation(false); // Chọn xong tự đóng menu
-                                                                        }}
-                                                                    >
-                                                                        <Check
-                                                                            className={cn(
-                                                                                "mr-2 h-4 w-4",
-                                                                                province === field.value ? "opacity-100 text-blue-600" : "opacity-0"
-                                                                            )}
-                                                                        />
-                                                                        {province}
-                                                                    </CommandItem>
-                                                                ))}
-                                                            </CommandGroup>
-                                                        </CommandList>
-                                                    </Command>
-                                                </PopoverContent>
-                                            </Popover>
-                                        )}
-                                    />
-                                    {errors.location && (
-                                        <p className="text-sm text-red-500 font-medium">
-                                            {errors.location.message}
-                                        </p>
-                                    )}
-                                </div>
+                                <TripDestinationPicker
+                                    province={selectedProvince}
+                                    destinationPlace={selectedDestinationPlace}
+                                    customDestination={customDestination}
+                                    provinceError={errors.province?.message}
+                                    destinationPlaceError={errors.destinationPlace?.message}
+                                    customDestinationError={errors.customDestination?.message}
+                                    onProvinceChange={(province) => {
+                                        setValue("province", province, { shouldDirty: true, shouldValidate: true });
+                                        setValue("destinationPlace", "", { shouldDirty: true });
+                                        setValue("customDestination", "", { shouldDirty: true });
+                                        clearErrors(["destinationPlace", "customDestination"]);
+                                    }}
+                                    onDestinationPlaceChange={(destinationPlace) => {
+                                        setValue("destinationPlace", destinationPlace, { shouldDirty: true, shouldValidate: true });
+                                        if (destinationPlace !== OTHER_DESTINATION_OPTION) {
+                                            setValue("customDestination", "", { shouldDirty: true });
+                                            clearErrors("customDestination");
+                                        }
+                                    }}
+                                    onCustomDestinationChange={(value) => {
+                                        setValue("customDestination", value, { shouldDirty: true, shouldValidate: true });
+                                    }}
+                                />
                             </div>
 
                             <div className="space-y-5">

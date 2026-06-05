@@ -237,18 +237,45 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       .trim();
   }
 
+  private normalizeProvinceSearchText(value: string) {
+    return this.normalizeSearchText(value)
+      .replace(/^(tp|thanh pho|tinh)\s+/, '')
+      .trim();
+  }
+
   private compactSearchText(value: string) {
-    return this.normalizeSearchText(value).replace(/\s+/g, '');
+    return this.normalizeSearchText(value).replace(/[^a-z0-9]/g, '');
+  }
+
+  private compactProvinceSearchText(value: string) {
+    return this.normalizeProvinceSearchText(value).replace(/[^a-z0-9]/g, '');
   }
 
   private normalizedDestinationSql() {
-    return `LOWER(translate(trip.destination, '${VIETNAMESE_SEARCH_CHARS}', '${VIETNAMESE_SEARCH_REPLACEMENTS}'))`;
+    return `LOWER(translate(COALESCE(trip.destination, ''), '${VIETNAMESE_SEARCH_CHARS}', '${VIETNAMESE_SEARCH_REPLACEMENTS}'))`;
+  }
+
+  private normalizedDestinationPlaceSql() {
+    return `LOWER(translate(COALESCE(trip.destination_place, ''), '${VIETNAMESE_SEARCH_CHARS}', '${VIETNAMESE_SEARCH_REPLACEMENTS}'))`;
+  }
+
+  private compactNormalizedSql(normalizedSql: string) {
+    return `regexp_replace(${normalizedSql}, '[^a-z0-9]', '', 'g')`;
+  }
+
+  private getTripDestinationLabel(
+    trip: Pick<Trip, 'destination' | 'destinationPlace'>,
+  ) {
+    return trip.destinationPlace
+      ? `${trip.destinationPlace}, ${trip.destination}`
+      : trip.destination;
   }
 
   private toPublicTrip(trip: Trip) {
     return {
       id: trip.id,
       destination: trip.destination,
+      destinationPlace: trip.destinationPlace,
       startDate: trip.startDate,
       endDate: trip.endDate,
       budget: trip.budget,
@@ -376,26 +403,27 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
     let score = 0;
 
     if (filters.destination?.trim()) {
-      const query = this.normalizeSearchText(filters.destination);
-      const compactQuery = this.compactSearchText(filters.destination);
+      const query = this.normalizeProvinceSearchText(filters.destination);
+      const compactQuery = this.compactProvinceSearchText(filters.destination);
       const destination = this.normalizeSearchText(trip.destination);
       const compactDestination = this.compactSearchText(trip.destination);
-      const destinationTokens = destination.split(' ');
 
       if (destination === query || compactDestination === compactQuery)
         score += 120;
-      else if (
-        destination.startsWith(query) ||
-        compactDestination.startsWith(compactQuery)
-      ) {
-        score += 95;
-      } else if (
-        destinationTokens.some((token) => token.startsWith(query)) ||
-        destination.includes(query) ||
-        compactDestination.includes(compactQuery)
-      ) {
-        score += 75;
-      }
+    }
+
+    if (filters.destinationPlace?.trim()) {
+      const query = this.normalizeSearchText(filters.destinationPlace);
+      const compactQuery = this.compactSearchText(filters.destinationPlace);
+      const destinationPlace = this.normalizeSearchText(
+        trip.destinationPlace ?? '',
+      );
+      const compactDestinationPlace = this.compactSearchText(
+        trip.destinationPlace ?? '',
+      );
+
+      if (destinationPlace === query || compactDestinationPlace === compactQuery)
+        score += 100;
     }
 
     if (filters.startDate) {
@@ -439,9 +467,15 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Vui lòng nhập địa điểm chuyến đi');
     }
 
+    const destinationPlace = dto.destinationPlace.trim();
+    if (!destinationPlace) {
+      throw new BadRequestException('Vui lòng nhập điểm đến cụ thể');
+    }
+
     const savedTrip = await this.dataSource.transaction(async (manager) => {
       const trip = manager.getRepository(Trip).create({
         destination,
+        destinationPlace,
         startDate: dto.startDate,
         endDate: dto.endDate,
         budget: dto.budget ?? null,
@@ -491,25 +525,42 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
 
     if (filters.destination?.trim()) {
       const normalizedDestination = this.normalizedDestinationSql();
-      const normalizedQuery = this.normalizeSearchText(filters.destination);
-      const compactQuery = this.compactSearchText(filters.destination);
-      const tokens = normalizedQuery.split(' ').filter(Boolean);
+      const normalizedQuery = this.normalizeProvinceSearchText(
+        filters.destination,
+      );
+      const compactQuery = this.compactProvinceSearchText(filters.destination);
 
       qb.andWhere(
         new Brackets((where) => {
-          tokens.forEach((token, index) => {
-            where.orWhere(
-              `${normalizedDestination} LIKE :destinationToken${index}`,
-              {
-                [`destinationToken${index}`]: `%${token}%`,
-              },
-            );
+          where.where(`${normalizedDestination} = :destination`, {
+            destination: normalizedQuery,
           });
 
           if (compactQuery) {
             where.orWhere(
-              `REPLACE(${normalizedDestination}, ' ', '') LIKE :destinationCompact`,
-              { destinationCompact: `%${compactQuery}%` },
+              `${this.compactNormalizedSql(normalizedDestination)} = :destinationCompact`,
+              { destinationCompact: compactQuery },
+            );
+          }
+        }),
+      );
+    }
+
+    if (filters.destinationPlace?.trim()) {
+      const normalizedDestinationPlace = this.normalizedDestinationPlaceSql();
+      const normalizedQuery = this.normalizeSearchText(filters.destinationPlace);
+      const compactQuery = this.compactSearchText(filters.destinationPlace);
+
+      qb.andWhere(
+        new Brackets((where) => {
+          where.where(`${normalizedDestinationPlace} = :destinationPlace`, {
+            destinationPlace: normalizedQuery,
+          });
+
+          if (compactQuery) {
+            where.orWhere(
+              `${this.compactNormalizedSql(normalizedDestinationPlace)} = :destinationPlaceCompact`,
+              { destinationPlaceCompact: compactQuery },
             );
           }
         }),
@@ -554,6 +605,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
     const stats = await this.loadTripStats(trips.map((trip) => trip.id));
     const hasSearchFilters = Boolean(
       filters.destination?.trim() ||
+      filters.destinationPlace?.trim() ||
       filters.startDate ||
       filters.endDate ||
       typeof filters.budget === 'number' ||
@@ -915,6 +967,13 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       }
       updatePayload.destination = destination;
     }
+    if (dto.destinationPlace !== undefined) {
+      const destinationPlace = dto.destinationPlace.trim();
+      if (!destinationPlace) {
+        throw new BadRequestException('Vui lòng nhập điểm đến cụ thể');
+      }
+      updatePayload.destinationPlace = destinationPlace;
+    }
     if (dto.startDate !== undefined) updatePayload.startDate = dto.startDate;
     if (dto.endDate !== undefined) updatePayload.endDate = dto.endDate;
     if (dto.budget !== undefined) updatePayload.budget = dto.budget;
@@ -1062,7 +1121,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       userId: trip.leaderId,
       type: NotificationType.TRIP_JOIN_REQUEST,
       title: 'Có yêu cầu tham gia mới',
-      message: `${requester.full_name} muốn tham gia chuyến đi ${trip.destination}.`,
+      message: `${requester.full_name} muốn tham gia chuyến đi ${this.getTripDestinationLabel(trip)}.`,
       targetUrl: `/trips/manage?tab=created&tripId=${trip.id}`,
       metadata: {
         tripId: trip.id,
@@ -1149,7 +1208,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       userId: request.user.id,
       type: NotificationType.TRIP_JOIN_APPROVED,
       title: 'Yêu cầu tham gia đã được duyệt',
-      message: `Bạn đã được duyệt vào chuyến đi ${request.trip.destination}.`,
+      message: `Bạn đã được duyệt vào chuyến đi ${this.getTripDestinationLabel(request.trip)}.`,
       targetUrl: `/trips/manage?tab=joined&tripId=${request.trip.id}`,
       metadata: {
         tripId: request.trip.id,
@@ -1176,7 +1235,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       userId: request.user.id,
       type: NotificationType.TRIP_JOIN_REJECTED,
       title: 'Yêu cầu tham gia chưa được duyệt',
-      message: `Leader đã từ chối yêu cầu vào chuyến đi ${request.trip.destination}.`,
+      message: `Leader đã từ chối yêu cầu vào chuyến đi ${this.getTripDestinationLabel(request.trip)}.`,
       targetUrl: `/trips/manage?tab=joined&tripId=${request.trip.id}`,
       metadata: {
         tripId: request.trip.id,
@@ -1314,7 +1373,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       userId: member.user.id,
       type: NotificationType.TRIP_MEMBER_REMOVED,
       title: 'Bạn đã bị xóa khỏi chuyến đi',
-      message: `Leader đã xóa bạn khỏi chuyến đi ${trip.destination}.`,
+      message: `Leader đã xóa bạn khỏi chuyến đi ${this.getTripDestinationLabel(trip)}.`,
       targetUrl: `/trips/${trip.id}`,
       metadata: { tripId: trip.id },
     });
@@ -1369,7 +1428,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       userId: trip.leaderId,
       type: NotificationType.TRIP_MEMBER_REMOVED,
       title: 'Thành viên đã rời chuyến đi',
-      message: `${member.user.full_name} đã rời nhóm của chuyến đi ${trip.destination}.`,
+      message: `${member.user.full_name} đã rời nhóm của chuyến đi ${this.getTripDestinationLabel(trip)}.`,
       targetUrl: `/trips/manage?tab=created&tripId=${trip.id}`,
       metadata: {
         tripId: trip.id,
@@ -1482,7 +1541,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
           userId: member.user.id,
           type: NotificationType.TRIP_AWAITING_CONFIRMATION,
           title: 'Xác nhận hoàn thành chuyến đi',
-          message: `Leader đã đánh dấu chuyến đi ${trip.destination} là hoàn thành. Vui lòng xác nhận để kết thúc!`,
+          message: `Leader đã đánh dấu chuyến đi ${this.getTripDestinationLabel(trip)} là hoàn thành. Vui lòng xác nhận để kết thúc!`,
           targetUrl: `/trips/manage?tab=joined&tripId=${trip.id}`,
           metadata: { tripId: trip.id },
         });

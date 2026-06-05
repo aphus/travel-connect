@@ -5,6 +5,7 @@ import {
   parseCurrencyInput,
   parsePositiveIntegerInput,
 } from "@/lib/trip-format";
+import { formatTripDestination } from "@/lib/vietnam-destinations";
 import { fetchWrapper } from "./fetchWrapper";
 
 export type TripStatus =
@@ -26,6 +27,7 @@ export type TripLeader = {
 export type Trip = {
   id: string;
   destination: string;
+  destinationPlace: string | null;
   startDate: string;
   endDate: string;
   budget: number | null;
@@ -82,6 +84,8 @@ export type TripMember = {
 type RawTrip = {
   id: string;
   destination: string;
+  destinationPlace?: string | null;
+  destination_place?: string | null;
   startDate?: string;
   start_date?: string;
   endDate?: string;
@@ -162,6 +166,7 @@ type RawTripMember = {
 
 export type CreateTripPayload = {
   destination: string;
+  destinationPlace: string;
   startDate: string;
   endDate: string;
   budget: number;
@@ -174,6 +179,7 @@ export type UpdateTripPayload = Partial<CreateTripPayload>;
 
 export type ListTripsFilters = {
   destination?: string;
+  destinationPlace?: string;
   startDate?: string;
   endDate?: string;
   budget?: number | string | null;
@@ -203,6 +209,10 @@ export async function listTrips(filters: ListTripsFilters = {}) {
 
   if (filters.destination?.trim()) {
     params.set("destination", filters.destination.trim());
+  }
+
+  if (filters.destinationPlace?.trim()) {
+    params.set("destinationPlace", filters.destinationPlace.trim());
   }
 
   if (filters.startDate) params.set("startDate", filters.startDate);
@@ -359,12 +369,13 @@ export async function confirmTripCompletion(tripId: string) {
 }
 
 export function tripToCardData(trip: Trip): TripCardData {
-  const { title } = splitTripDescription(trip.description, trip.destination);
+  const destinationLabel = getTripDestinationLabel(trip);
+  const { title } = splitTripDescription(trip.description, destinationLabel);
 
   return {
     id: trip.id,
     title,
-    location: trip.destination,
+    location: destinationLabel,
     startDate: formatDisplayDate(trip.startDate),
     endDate: formatDisplayDate(trip.endDate),
     budget: formatCurrencyVnd(trip.budget),
@@ -383,13 +394,14 @@ export function tripToCardData(trip: Trip): TripCardData {
 }
 
 export function tripToDetailData(trip: Trip) {
-  const { title, body } = splitTripDescription(trip.description, trip.destination);
+  const destinationLabel = getTripDestinationLabel(trip);
+  const { title, body } = splitTripDescription(trip.description, destinationLabel);
 
   return {
     id: trip.id,
     title,
     description: body || trip.description || "Chưa có mô tả chi tiết.",
-    destination: trip.destination,
+    destination: destinationLabel,
     startDate: formatDisplayDate(trip.startDate),
     endDate: formatDisplayDate(trip.endDate),
     budget: formatCurrencyVnd(trip.budget),
@@ -408,13 +420,23 @@ export function tripToDetailData(trip: Trip) {
 }
 
 export function getTripTitle(trip: Trip) {
-  return splitTripDescription(trip.description, trip.destination).title;
+  return splitTripDescription(
+    trip.description,
+    getTripDestinationLabel(trip),
+  ).title;
+}
+
+export function getTripDestinationLabel(
+  trip: Pick<Trip, "destination" | "destinationPlace">,
+) {
+  return formatTripDestination(trip.destination, trip.destinationPlace);
 }
 
 function normalizeTrip(trip: RawTrip): Trip {
   return {
     id: trip.id,
     destination: trip.destination,
+    destinationPlace: trip.destinationPlace ?? trip.destination_place ?? null,
     startDate: trip.startDate ?? trip.start_date ?? "",
     endDate: trip.endDate ?? trip.end_date ?? "",
     budget:

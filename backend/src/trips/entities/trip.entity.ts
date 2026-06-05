@@ -38,6 +38,9 @@ export class Trip {
   @Column()
   destination!: string;
 
+  @Column({ name: 'destination_place', type: 'varchar', length: 160, nullable: true })
+  destinationPlace!: string | null;
+
   @Column({ name: 'start_date', type: 'date' })
   startDate!: string;
 

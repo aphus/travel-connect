@@ -13,6 +13,7 @@ import {
 import {
     getMyCreatedTrips,
     getMyJoinedTrips,
+    getTripDestinationLabel,
     getTripTitle,
     type Trip,
 } from "@/services/trips";
@@ -220,7 +221,7 @@ function tripToChatRoom(trip: Trip): ChatRoom {
     return {
         id: trip.id,
         title: getTripTitle(trip),
-        subtitle: `${trip.destination} • ${trip.currentMembers}/${trip.maxMembers} thành viên`,
+        subtitle: `${getTripDestinationLabel(trip)} • ${trip.currentMembers}/${trip.maxMembers} thành viên`,
         meta: trip.startDate ? formatDisplayDate(trip.startDate) : "Chuyến đi",
         avatarUrl: trip.coverUrl ?? "",
     };

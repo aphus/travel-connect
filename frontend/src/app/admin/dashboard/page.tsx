@@ -3,14 +3,22 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, Map, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
-import { getAllUsers, getAllTrips, getAllReports, AdminReport } from "@/services/admin";
+import {
+    getAdminTripDestinationLabel,
+    getAllReports,
+    getAllTrips,
+    getAllUsers,
+    type AdminReport,
+    type AdminTrip,
+    type AdminUser,
+} from "@/services/admin";
 
 import DashboardChart from "@/components/admin/dashboard/DashboardChart";
 import RecentActivities, { Activity } from "@/components/admin/dashboard/RecentActivities";
 
 export default function AdminDashboardPage() {
     const [statsData, setStatsData] = useState({ users: 0, trips: 0, reports: 0 });
-    const [chartData, setChartData] = useState<any[]>([]);
+    const [chartData, setChartData] = useState<Array<{ name: string; "Người dùng mới": number; "Chuyến đi mới": number }>>([]);
     const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
     const [reportsList, setReportsList] = useState<AdminReport[]>([]);
 
@@ -27,9 +35,9 @@ export default function AdminDashboardPage() {
                     getAllReports().catch(() => [])
                 ]);
 
-                const safeUsers = Array.isArray(users) ? users : [];
-                const safeTrips = Array.isArray(trips) ? trips : [];
-                const safeReports = Array.isArray(reports) ? reports : [];
+                const safeUsers: AdminUser[] = Array.isArray(users) ? users : [];
+                const safeTrips: AdminTrip[] = Array.isArray(trips) ? trips : [];
+                const safeReports: AdminReport[] = Array.isArray(reports) ? reports : [];
 
                 const pendingReports = safeReports.filter((r: any) => r.status !== 'resolved' && r.status !== 'rejected');
 
@@ -53,15 +61,15 @@ export default function AdminDashboardPage() {
 
                     return {
                         name: displayDate,
-                        "Người dùng mới": safeUsers.filter((u: any) => (u.createdAt || u.created_at)?.startsWith(dateString)).length,
-                        "Chuyến đi mới": safeTrips.filter((t: any) => t.createdAt?.startsWith(dateString)).length || safeTrips.filter((t: any) => t.startDate?.startsWith(dateString)).length,
+                        "Người dùng mới": safeUsers.filter((user) => (user.createdAt || user.created_at)?.startsWith(dateString)).length,
+                        "Chuyến đi mới": safeTrips.filter((trip) => trip.createdAt?.startsWith(dateString)).length || safeTrips.filter((trip) => trip.startDate?.startsWith(dateString)).length,
                     };
                 });
                 setChartData(newChartData);
 
                 // --- XỬ LÝ HOẠT ĐỘNG GẦN ĐÂY ---
                 const activities: Activity[] = [];
-                safeUsers.forEach((u: any) => {
+                safeUsers.forEach((u) => {
                     const userDate = u.createdAt || u.created_at;
                     const userName = u.fullName || u.full_name || u.email;
                     if (userDate) {
@@ -69,10 +77,10 @@ export default function AdminDashboardPage() {
                     }
                 });
 
-                safeTrips.forEach((t: any) => {
+                safeTrips.forEach((t) => {
                     const timeRef = t.createdAt || t.startDate;
                     if (timeRef) {
-                        activities.push({ id: `t-${t.id}`, type: 'trip', title: `Chuyến đi mới: ${t.destination}`, time: new Date(timeRef) });
+                        activities.push({ id: `t-${t.id}`, type: 'trip', title: `Chuyến đi mới: ${getAdminTripDestinationLabel(t)}`, time: new Date(timeRef) });
                     }
                 });
 

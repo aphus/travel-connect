@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Compass, UserCircle, LayoutList, LogOut, Menu, LogIn, MessageCircle, Bell, CheckCheck } from "lucide-react";
+import { Compass, UserCircle, LayoutList, LogOut, Menu, LogIn, MessageCircle, Bell, CheckCheck, LockKeyhole } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -13,8 +13,18 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { clearAccessToken, getAccessToken } from "@/services/fetchWrapper";
-import { getCurrentUser, getStoredAuthUser, storeAuthUser, type AuthUser } from "@/services/auth";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ApiError, clearAccessToken, getAccessToken } from "@/services/fetchWrapper";
+import { changePassword, getCurrentUser, getStoredAuthUser, storeAuthUser, type AuthUser } from "@/services/auth";
 import { getUserInitials } from "@/lib/user";
 import {
     getNotifications,
@@ -32,6 +42,13 @@ export default function SmartHeader() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [changePasswordError, setChangePasswordError] = useState("");
+    const [changePasswordSuccess, setChangePasswordSuccess] = useState("");
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -144,6 +161,59 @@ export default function SmartHeader() {
         setNotifications([]);
         setUnreadCount(0);
         router.push("/login");
+    };
+
+    const resetChangePasswordForm = () => {
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setChangePasswordError("");
+        setChangePasswordSuccess("");
+        setIsChangingPassword(false);
+    };
+
+    const handleChangePasswordOpenChange = (open: boolean) => {
+        setIsChangePasswordOpen(open);
+        if (!open) resetChangePasswordForm();
+    };
+
+    const handleChangePasswordSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setChangePasswordError("");
+        setChangePasswordSuccess("");
+
+        if (currentPassword.length < 6) {
+            setChangePasswordError("Mật khẩu cũ phải có ít nhất 6 ký tự.");
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            setChangePasswordError("Mật khẩu mới phải có ít nhất 6 ký tự.");
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            setChangePasswordError("Mật khẩu nhập lại không khớp.");
+            return;
+        }
+
+        setIsChangingPassword(true);
+
+        try {
+            await changePassword({ currentPassword, newPassword });
+            setChangePasswordSuccess("Đổi mật khẩu thành công.");
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+        } catch (error) {
+            setChangePasswordError(
+                error instanceof ApiError
+                    ? error.message
+                    : "Không thể đổi mật khẩu. Vui lòng thử lại.",
+            );
+        } finally {
+            setIsChangingPassword(false);
+        }
     };
 
     // 1. Ẩn Header ở trang Login / Register
@@ -299,12 +369,83 @@ export default function SmartHeader() {
                                             <LayoutList className="h-4 w-4 text-slate-500" /> Quản lý chuyến đi
                                         </Link>
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() => setIsChangePasswordOpen(true)}
+                                        className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl hover:bg-slate-50"
+                                    >
+                                        <LockKeyhole className="h-4 w-4 text-slate-500" /> Đổi mật khẩu
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-slate-100" />
                                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-3 py-2.5 px-4 rounded-xl text-red-600 focus:text-red-600 focus:bg-red-50">
                                         <LogOut className="h-4 w-4" /> Đăng xuất
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
+
+                            <Dialog open={isChangePasswordOpen} onOpenChange={handleChangePasswordOpenChange}>
+                                <DialogContent className="sm:max-w-md">
+                                    <form onSubmit={handleChangePasswordSubmit} className="space-y-5">
+                                        <DialogHeader>
+                                            <DialogTitle>Đổi mật khẩu</DialogTitle>
+                                            <DialogDescription>
+                                                Nhập mật khẩu cũ, mật khẩu mới và xác nhận lại để cập nhật tài khoản.
+                                            </DialogDescription>
+                                        </DialogHeader>
+
+                                        <div className="space-y-3">
+                                            <Input
+                                                type="password"
+                                                value={currentPassword}
+                                                onChange={(event) => setCurrentPassword(event.target.value)}
+                                                placeholder="Mật khẩu cũ"
+                                                autoComplete="current-password"
+                                                className="h-11"
+                                            />
+                                            <Input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(event) => setNewPassword(event.target.value)}
+                                                placeholder="Mật khẩu mới"
+                                                autoComplete="new-password"
+                                                className="h-11"
+                                            />
+                                            <Input
+                                                type="password"
+                                                value={confirmPassword}
+                                                onChange={(event) => setConfirmPassword(event.target.value)}
+                                                placeholder="Nhập lại mật khẩu mới"
+                                                autoComplete="new-password"
+                                                className="h-11"
+                                            />
+                                        </div>
+
+                                        {changePasswordError && (
+                                            <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                                                {changePasswordError}
+                                            </p>
+                                        )}
+
+                                        {changePasswordSuccess && (
+                                            <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                                                {changePasswordSuccess}
+                                            </p>
+                                        )}
+
+                                        <DialogFooter>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => handleChangePasswordOpenChange(false)}
+                                            >
+                                                Hủy
+                                            </Button>
+                                            <Button type="submit" disabled={isChangingPassword}>
+                                                {isChangingPassword ? "Đang đổi..." : "Đổi mật khẩu"}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
                         </>
                     ) : (
                         <div className="flex items-center gap-2">
