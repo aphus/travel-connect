@@ -31,10 +31,12 @@ export default function AdminDashboardPage() {
                 const safeTrips = Array.isArray(trips) ? trips : [];
                 const safeReports = Array.isArray(reports) ? reports : [];
 
+                const pendingReports = safeReports.filter((r: any) => r.status !== 'resolved' && r.status !== 'rejected');
+
                 setStatsData({
                     users: safeUsers.length,
                     trips: safeTrips.length,
-                    reports: safeReports.length,
+                    reports: pendingReports.length,
                 });
                 setReportsList(safeReports);
 

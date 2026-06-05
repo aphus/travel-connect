@@ -10,6 +10,9 @@ export type AdminUser = {
     is_banned?: boolean;
     createdAt?: string;
     created_at?: string;
+    trust_score?: number;
+    tripsCreated?: number;
+    avatar_url?: string;
 };
 
 // 1. Lấy danh sách toàn bộ người dùng
@@ -38,6 +41,7 @@ export type AdminTrip = {
     description?: string;
     cost?: number;
     createdAt?: string;
+    maxMembers: number;
 
     members?: {
         id: string;
@@ -47,6 +51,7 @@ export type AdminTrip = {
             id: string;
             full_name?: string;
             email?: string;
+            avatar?: string;
         }
     }[];
 };
@@ -90,4 +95,18 @@ export type AdminReport = {
     trip?: { id: string; destination?: string };
     previousReportCount?: number;
     accountStatus?: string;
+    admin_note?: string | null;
 };
+
+export const getUserTrips = async (userId: string) => {
+    return await fetchWrapper(`/admin/users/${userId}/trips`, {
+        method: 'GET',
+    });
+};
+
+export async function sendTripNotificationAsAdmin(tripId: string, payload: { type: string; message: string; broadcastToMembers: boolean }) {
+    return fetchWrapper<{ success: boolean; message: string; sentCount: number }>(`/admin/trips/${tripId}/notify`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+}

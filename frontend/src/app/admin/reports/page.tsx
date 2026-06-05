@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, Clock, CheckCircle2, User, MapPin, ShieldAlert, Ban, Send, Check, Loader2 } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle2, User, MapPin, ShieldAlert, Ban, Send, Check, Loader2, History } from "lucide-react";
 import { getAllReports, AdminReport } from "@/services/admin";
 import { fetchWrapper } from "@/services/fetchWrapper";
 
@@ -19,6 +19,9 @@ export default function AdminReportsPage() {
     const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // BIẾN TRẠNG THÁI MỚI ĐỂ CHUYỂN TAB
+    const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
+
     const loadReports = async () => {
         try {
             setIsLoading(true);
@@ -35,7 +38,12 @@ export default function AdminReportsPage() {
         loadReports();
     }, []);
 
-    const pendingReports = reports.filter(r => r.status !== 'resolved');
+    // TÁCH LÀM 2 RỔ DATA RIÊNG BIỆT
+    const pendingReports = reports.filter(r => r.status !== 'resolved' && r.status !== 'rejected');
+    const historyReports = reports.filter(r => r.status === 'resolved' || r.status === 'rejected');
+
+    // Dữ liệu sẽ hiển thị tùy thuộc vào Tab đang chọn
+    const displayReports = activeTab === 'PENDING' ? pendingReports : historyReports;
 
     const handleAction = async (actionType: 'BAN' | 'WARN' | 'IGNORE', banDays?: number) => {
         if (!selectedReport) return;
@@ -46,17 +54,19 @@ export default function AdminReportsPage() {
                 ? `/admin/users/${selectedReport.reported_id}/ban?days=${banDays}`
                 : `/admin/users/${selectedReport.reported_id}/ban`;
 
-            await fetchWrapper(url, {
-                method: "PATCH"
-            });
+            await fetchWrapper(url, { method: "PATCH" });
             alert(`Đã KHÓA tài khoản của ${selectedReport.reported?.full_name || 'người dùng'} ${banDays ? `(Trong ${banDays} ngày)` : '(Vĩnh viễn)'}.`);
         }
         else if (actionType === 'WARN') {
+            await fetchWrapper(`/admin/users/${selectedReport.reported_id}/warn`, {
+                method: "PATCH"
+            });
             alert(`Đã gửi cảnh cáo tới ${selectedReport.reported?.full_name || 'người dùng'}.`);
         }
 
         await fetchWrapper(`/reports/${selectedReport.id}/resolve`, {
             method: "PATCH",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "resolved", admin_note: actionType })
         });
 
@@ -67,11 +77,39 @@ export default function AdminReportsPage() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-            <div>
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                    <AlertTriangle className="w-8 h-8 text-rose-500" /> Quản lý Báo cáo
-                </h2>
-                <p className="text-slate-500 mt-1">Kiểm duyệt và xử lý các hành vi vi phạm từ người dùng.</p>
+            <div className="flex items-end justify-between">
+                <div>
+                    <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                        <AlertTriangle className="w-8 h-8 text-rose-500" /> Quản lý Báo cáo
+                    </h2>
+                    <p className="text-slate-500 mt-1">Kiểm duyệt và xử lý các hành vi vi phạm từ người dùng.</p>
+                </div>
+
+                {/* --- KHU VỰC NÚT CHUYỂN TAB --- */}
+                <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
+                    <button
+                        onClick={() => setActiveTab('PENDING')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'PENDING'
+                            ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                            }`}
+                    >
+                        <AlertTriangle className="w-4 h-4" />
+                        Chờ xử lý
+                        {pendingReports.length > 0 && (
+                            <span className="ml-1 bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingReports.length}</span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('HISTORY')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'HISTORY'
+                            ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                            }`}
+                    >
+                        <History className="w-4 h-4" /> Lịch sử
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
@@ -79,19 +117,19 @@ export default function AdminReportsPage() {
                     <div className="py-20 flex justify-center">
                         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
                     </div>
-                ) : pendingReports.length > 0 ? (
+                ) : displayReports.length > 0 ? (
                     <div className="flex flex-col gap-6">
-                        {pendingReports.map((report) => {
+                        {displayReports.map((report) => {
                             const reportedName = report.reported?.full_name || report.reported?.email || "N/A";
                             const tripDest = report.trip?.destination || "N/A";
                             const reportDate = report.created_at || report.createdAt;
                             const reasonText = REASON_MAP[report.reason] || report.reason;
 
                             return (
-                                <div key={report.id} className="bg-slate-50 p-5 rounded-xl border border-rose-100 shadow-sm flex flex-col gap-4 transition-all hover:shadow-md hover:border-rose-200">
+                                <div key={report.id} className={`bg-slate-50 p-5 rounded-xl border shadow-sm flex flex-col gap-4 transition-all hover:shadow-md ${activeTab === 'HISTORY' ? 'border-slate-200 opacity-80' : 'border-rose-100 hover:border-rose-200'}`}>
                                     <div className="flex justify-between items-start">
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-md bg-rose-100 text-rose-700">
-                                            <User className="w-4 h-4" /> Tố cáo Thành viên
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-md ${activeTab === 'HISTORY' ? 'bg-slate-200 text-slate-700' : 'bg-rose-100 text-rose-700'}`}>
+                                            <User className="w-4 h-4" /> {activeTab === 'HISTORY' ? 'Báo cáo đã đóng' : 'Tố cáo Thành viên'}
                                         </span>
                                         <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
                                             <Clock className="w-3.5 h-3.5" />
@@ -100,7 +138,6 @@ export default function AdminReportsPage() {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-slate-100">
-                                        {/* CỘT 1: THÔNG TIN NGƯỜI BỊ TỐ CÁO & TIỀN SỰ */}
                                         <div>
                                             <p className="text-xs text-slate-500 mb-1">Người bị tố cáo:</p>
                                             <p className="text-sm font-bold text-slate-800 line-clamp-1">{reportedName}</p>
@@ -125,7 +162,6 @@ export default function AdminReportsPage() {
                                             </div>
                                         </div>
 
-                                        {/* CỘT 2: THÔNG TIN CHUYẾN ĐI */}
                                         <div>
                                             <p className="text-xs text-slate-500 mb-1">Từ chuyến đi:</p>
                                             <p className="text-sm font-bold text-slate-800 line-clamp-1 flex items-center gap-1">
@@ -134,7 +170,6 @@ export default function AdminReportsPage() {
                                         </div>
                                     </div>
 
-                                    {/* CHI TIẾT LÝ DO TỐ CÁO */}
                                     <div>
                                         <p className="text-sm text-slate-800 font-bold">Lý do: <span className="text-rose-600 font-medium">{reasonText}</span></p>
                                         {report.description && (
@@ -143,12 +178,19 @@ export default function AdminReportsPage() {
                                     </div>
 
                                     <div className="flex justify-end mt-auto pt-2">
-                                        <button
-                                            onClick={() => setSelectedReport(report)}
-                                            className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg transition-colors shadow-sm"
-                                        >
-                                            Xử lý vi phạm
-                                        </button>
+                                        {activeTab === 'PENDING' ? (
+                                            <button
+                                                onClick={() => setSelectedReport(report)}
+                                                className="text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg transition-colors shadow-sm"
+                                            >
+                                                Xử lý vi phạm
+                                            </button>
+                                        ) : (
+                                            <span className="text-xs font-bold px-3 py-1.5 rounded-md bg-slate-100 text-slate-500 flex items-center gap-1 border border-slate-200">
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                Kết quả: {report.admin_note === 'BAN' ? 'Đã Khóa' : report.admin_note === 'WARN' ? 'Đã Cảnh Cáo' : 'Đã Bỏ Qua'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -156,8 +198,17 @@ export default function AdminReportsPage() {
                     </div>
                 ) : (
                     <div className="py-20 flex flex-col items-center justify-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                        <CheckCircle2 className="w-16 h-16 text-emerald-400 mb-4" />
-                        <p className="font-medium text-slate-600 text-lg">Tuyệt vời! Không có báo cáo vi phạm nào chờ xử lý.</p>
+                        {activeTab === 'PENDING' ? (
+                            <>
+                                <CheckCircle2 className="w-16 h-16 text-emerald-400 mb-4" />
+                                <p className="font-medium text-slate-600 text-lg">Tuyệt vời! Không có báo cáo vi phạm nào chờ xử lý.</p>
+                            </>
+                        ) : (
+                            <>
+                                <History className="w-16 h-16 text-slate-300 mb-4" />
+                                <p className="font-medium text-slate-600 text-lg">Chưa có lịch sử xử lý báo cáo nào.</p>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

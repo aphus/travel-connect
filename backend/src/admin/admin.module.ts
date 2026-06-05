@@ -7,14 +7,16 @@ import { Trip } from '../trips/entities/trip.entity';
 import { Report } from '../reports/entities/report.entity';
 import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../trips/trips.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Trip, Report]),
     UsersModule,
     TripsModule,
+    NotificationsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],
 })
-export class AdminModule {}
+export class AdminModule { }
