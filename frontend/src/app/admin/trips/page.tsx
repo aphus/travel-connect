@@ -8,7 +8,6 @@ import {
   Loader2,
   Map,
   Calendar,
-  Users,
   Filter,
   Navigation,
   CheckCircle2,
@@ -31,67 +30,64 @@ export default function AdminTripsPage() {
   const [selectedTrip, setSelectedTrip] = useState<AdminTrip | null>(null);
   const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
 
-  async function loadTrips() {
-    await Promise.resolve();
+  const handleExecuteSendNotification = async (payload: {
+    type: string;
+    message: string;
+    broadcastToMembers: boolean;
+  }) => {
+    if (!selectedTrip) return;
 
-    const handleExecuteSendNotification = async (payload: {
-      type: string;
-      message: string;
-      broadcastToMembers: boolean;
-    }) => {
-      if (!selectedTrip) return;
+    try {
+      const response = await sendTripNotificationAsAdmin(
+        selectedTrip.id,
+        payload,
+      );
+      alert(response.message || "Đã gửi thông báo thành công!");
+      setIsNotifyModalOpen(false);
+    } catch (error) {
+      console.error("Lỗi khi gửi thông báo:", error);
+      alert("Gửi thông báo thất bại. Vui lòng kiểm tra lại!");
+    }
+  };
 
-      try {
-        const response = await sendTripNotificationAsAdmin(
-          selectedTrip.id,
-          payload,
-        );
-        alert(response.message || "Đã gửi thông báo thành công!");
-        setIsNotifyModalOpen(false);
-      } catch (error) {
-        console.error("Lỗi khi gửi thông báo:", error);
-        alert("Gửi thông báo thất bại. Vui lòng kiểm tra lại!");
-      }
-    };
+  const fetchTrips = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getAllTrips();
+      setTrips(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Lỗi khi tải dữ liệu:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const loadTrips = async () => {
-      try {
-        setIsLoading(true);
-        const data = await getAllTrips();
-        setTrips(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Lỗi khi tải dữ liệu:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void fetchTrips();
+    }, 0);
 
-    useEffect(() => {
-      const timeoutId = window.setTimeout(() => {
-        void loadTrips();
-      }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
-      return () => window.clearTimeout(timeoutId);
-    }, []);
+  // Lọc dữ liệu kết hợp Tìm kiếm & Trạng thái
+  const filteredTrips = trips.filter((trip) => {
+    const matchesSearch = (trip.destination || "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      filterStatus === "ALL" || trip.status === filterStatus.toLowerCase();
+    return matchesSearch && matchesStatus;
+  });
 
-    // Lọc dữ liệu kết hợp Tìm kiếm & Trạng thái
-    const filteredTrips = trips.filter((trip) => {
-      const matchesSearch = (trip.destination || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        filterStatus === "ALL" || trip.status === filterStatus.toLowerCase();
-      return matchesSearch && matchesStatus;
-    });
+  // Tính toán số liệu cho phần Thống kê
+  const stats = {
+    total: trips.length,
+    ongoing: trips.filter((t) => t.status === "ongoing").length,
+    completed: trips.filter((t) => t.status === "completed").length,
+  };
 
-    // Tính toán số liệu cho phần Thống kê
-    const stats = {
-      total: trips.length,
-      ongoing: trips.filter((t) => t.status === "ongoing").length,
-      completed: trips.filter((t) => t.status === "completed").length,
-    };
-
-    return (
+  return (
       <div className="p-6 space-y-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* --- HEADER --- */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -305,7 +301,7 @@ export default function AdminTripsPage() {
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={(e) => {
+                              onClick={() => {
                                 // Log thử để kiểm tra khi click
                                 console.log("Status clicked:", trip.status);
 
@@ -387,5 +383,4 @@ export default function AdminTripsPage() {
         />
       </div>
     );
-  }
 }
