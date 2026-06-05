@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -37,8 +38,10 @@ import {
 
 import {
     getCurrentUser,
+    sendPhoneOtp,
     storeAuthUser,
     updateCurrentUser,
+    verifyPhoneOtp,
     type AuthUser,
 } from "@/services/auth";
 import { ApiError } from "@/services/fetchWrapper";
@@ -89,28 +92,35 @@ function hasProfileValue(value?: string | null) {
 function getProfileCompletion(user: AuthUser | null) {
     if (!user) return 0;
 
-    const fields = [
-        user.avatarUrl,
-        user.fullName,
-        user.phoneNumber,
-        user.dateOfBirth,
-        user.city,
-        user.emergencyContactPhone,
-        hasProfileValue(user.bio) ? user.bio : user.travelStyle,
+    const criteria = [
+        hasProfileValue(user.avatarUrl),
+        hasProfileValue(user.fullName),
+        hasProfileValue(user.phoneNumber),
+        Boolean(user.phoneVerified),
+        hasProfileValue(user.dateOfBirth),
+        hasProfileValue(user.city),
+        hasProfileValue(user.emergencyContactPhone),
+        hasProfileValue(user.bio) || hasProfileValue(user.travelStyle),
     ];
-    const completed = fields.filter((field) => hasProfileValue(field)).length;
+    const completed = criteria.filter(Boolean).length;
 
-    return Math.round((completed / fields.length) * 100);
+    return Math.round((completed / criteria.length) * 100);
 }
 
 function TrustStatusItem({
     icon: Icon,
     label,
     verified,
+    detail,
+    statusLabel,
+    action,
 }: {
     icon: React.ElementType;
     label: string;
     verified: boolean;
+    detail?: string;
+    statusLabel?: string;
+    action?: React.ReactNode;
 }) {
     return (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
@@ -118,11 +128,19 @@ function TrustStatusItem({
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
                     <Icon className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-semibold text-slate-700">{label}</span>
+                <div className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-700">{label}</span>
+                    {detail && (
+                        <span className="block truncate text-xs font-medium text-slate-500">{detail}</span>
+                    )}
+                </div>
             </div>
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                {verified ? "Đã xác minh" : "Chưa xác minh"}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                    {statusLabel ?? (verified ? "Đã xác minh" : "Chưa xác minh")}
+                </span>
+                {action}
+            </div>
         </div>
     );
 }
@@ -144,6 +162,13 @@ export default function EnhancedProfilePage() {
 
     const [activeTab, setActiveTab] = useState<"about" | "upcoming" | "reviews" | "created" | "completed">("about");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isPhoneOtpOpen, setIsPhoneOtpOpen] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+    const [otpSent, setOtpSent] = useState(false);
+    const [otpCode, setOtpCode] = useState("");
+    const [phoneOtpMessage, setPhoneOtpMessage] = useState("");
+    const [phoneOtpError, setPhoneOtpError] = useState("");
 
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
@@ -293,6 +318,64 @@ export default function EnhancedProfilePage() {
         if (!open) setStatusMessage("");
     };
 
+    const resetPhoneOtpState = () => {
+        setOtpSent(false);
+        setOtpCode("");
+        setPhoneOtpMessage("");
+        setPhoneOtpError("");
+    };
+
+    const handlePhoneOtpOpenChange = (open: boolean) => {
+        setIsPhoneOtpOpen(open);
+        if (!open) resetPhoneOtpState();
+    };
+
+    const handleSendPhoneOtp = async () => {
+        const phoneNumber = currentUser?.phoneNumber?.trim();
+        if (!phoneNumber) {
+            setPhoneOtpError("Vui lòng cập nhật số điện thoại trước.");
+            return;
+        }
+
+        setIsSendingOtp(true);
+        setPhoneOtpError("");
+        setPhoneOtpMessage("");
+
+        try {
+            const result = await sendPhoneOtp(phoneNumber);
+            setOtpSent(true);
+            setPhoneOtpMessage(result.message);
+        } catch (error) {
+            setPhoneOtpError(error instanceof ApiError ? error.message : "Không thể gửi OTP.");
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleVerifyPhoneOtp = async () => {
+        const phoneNumber = currentUser?.phoneNumber?.trim();
+        if (!phoneNumber) {
+            setPhoneOtpError("Vui lòng cập nhật số điện thoại trước.");
+            return;
+        }
+
+        setIsVerifyingOtp(true);
+        setPhoneOtpError("");
+
+        try {
+            const updatedUser = await verifyPhoneOtp(phoneNumber, otpCode);
+            setCurrentUser(updatedUser);
+            storeAuthUser(updatedUser);
+            reset(getProfileFormDefaults(updatedUser));
+            setIsPhoneOtpOpen(false);
+            resetPhoneOtpState();
+        } catch (error) {
+            setPhoneOtpError(error instanceof ApiError ? error.message : "Không thể xác minh OTP.");
+        } finally {
+            setIsVerifyingOtp(false);
+        }
+    };
+
     if (isLoadingProfile) {
         return (
             <div className="container mx-auto px-4 py-16 flex justify-center">
@@ -306,6 +389,13 @@ export default function EnhancedProfilePage() {
     const profileCompletion = getProfileCompletion(currentUser);
     const isProfileReady = Boolean(currentUser?.profileCompleted);
     const needsAvatarForProfile = !hasProfileValue(currentUser?.avatarUrl);
+    const phoneNumber = currentUser?.phoneNumber?.trim() ?? "";
+    const isPhoneVerified = Boolean(phoneNumber && currentUser?.phoneVerified);
+    const phoneStatusLabel = phoneNumber
+        ? isPhoneVerified
+            ? "Đã xác minh"
+            : "Chưa xác minh"
+        : "Chưa cập nhật";
 
     return (
         <div className="container max-w-5xl mx-auto px-4 py-10">
@@ -441,6 +531,61 @@ export default function EnhancedProfilePage() {
                 </div>
             </div>
 
+            <Dialog open={isPhoneOtpOpen} onOpenChange={handlePhoneOtpOpenChange}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">Xác minh số điện thoại</DialogTitle>
+                        <DialogDescription>
+                            {phoneNumber || "Chưa cập nhật số điện thoại"}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <Button
+                            type="button"
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white"
+                            onClick={handleSendPhoneOtp}
+                            disabled={!phoneNumber || isSendingOtp}
+                        >
+                            {isSendingOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang gửi...</> : "Gửi OTP"}
+                        </Button>
+                        {otpSent && (
+                            <div className="space-y-2">
+                                <Label htmlFor="phoneOtpCode" className="text-sm font-bold text-slate-700">Mã OTP</Label>
+                                <Input
+                                    id="phoneOtpCode"
+                                    inputMode="numeric"
+                                    placeholder="Nhập mã OTP"
+                                    value={otpCode}
+                                    onChange={(event) => setOtpCode(event.target.value)}
+                                />
+                                <p className="text-xs font-medium text-slate-500">Mã OTP demo: 123456</p>
+                            </div>
+                        )}
+                        {phoneOtpMessage && (
+                            <p className="rounded-md border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                                {phoneOtpMessage}
+                            </p>
+                        )}
+                        {phoneOtpError && (
+                            <p className="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                {phoneOtpError}
+                            </p>
+                        )}
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                            <Button type="button" variant="ghost" onClick={() => setIsPhoneOtpOpen(false)}>Hủy</Button>
+                            <Button
+                                type="button"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                onClick={handleVerifyPhoneOtp}
+                                disabled={!otpSent || !otpCode.trim() || isVerifyingOtp}
+                            >
+                                {isVerifyingOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xác minh...</> : "Xác minh"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* --- THỐNG KÊ --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                 <Card className="border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab('reviews')}>
@@ -529,7 +674,21 @@ export default function EnhancedProfilePage() {
                                     <TrustStatusItem
                                         icon={Phone}
                                         label="Số điện thoại"
-                                        verified={Boolean(currentUser?.phoneVerified)}
+                                        detail={phoneNumber || "Chưa cập nhật"}
+                                        verified={isPhoneVerified}
+                                        statusLabel={phoneStatusLabel}
+                                        action={!isPhoneVerified ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 rounded-full px-3 text-xs font-bold"
+                                                disabled={!phoneNumber}
+                                                onClick={() => setIsPhoneOtpOpen(true)}
+                                            >
+                                                Xác minh
+                                            </Button>
+                                        ) : null}
                                     />
                                     <TrustStatusItem
                                         icon={UserCheck}

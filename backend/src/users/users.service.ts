@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DeepPartial, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -6,6 +11,8 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Trip, TripStatus } from '../trips/entities/trip.entity';
 import { JoinRequest, RequestStatus } from '../trips/entities/join_request.entity';
 import { TripMember } from '../trips/entities/trip_member.entity';
+import { SendPhoneOtpDto } from './dto/send-phone-otp.dto';
+import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 
 type TripReliability = {
   completed_trips: number;
@@ -20,6 +27,7 @@ type TripReliability = {
 };
 
 const LEFT_TRIP_MESSAGE = '__TRIPCONNECT_LEFT_TRIP__';
+const DEMO_PHONE_OTP = '123456';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +36,7 @@ export class UsersService {
 
   toPrivateUser(user: User) {
     const profileCompleted = this.isProfileCompleted(user);
+    const phoneVerified = Boolean(user.phone_number?.trim() && user.phone_verified);
 
     return {
       id: user.id,
@@ -48,7 +57,7 @@ export class UsersService {
       travel_style: user.travel_style,
       travel_preferences: user.travel_preferences,
       email_verified: user.email_verified,
-      phone_verified: user.phone_verified,
+      phone_verified: phoneVerified,
       identity_verified: user.identity_verified,
       profile_completed: profileCompleted,
       created_at: user.created_at,
@@ -59,6 +68,7 @@ export class UsersService {
 
   toPublicUser(user: User) {
     const profileCompleted = this.isProfileCompleted(user);
+    const phoneVerified = Boolean(user.phone_number?.trim() && user.phone_verified);
 
     return {
       id: user.id,
@@ -74,7 +84,7 @@ export class UsersService {
       travel_style: user.travel_style,
       travel_preferences: user.travel_preferences,
       email_verified: user.email_verified,
-      phone_verified: user.phone_verified,
+      phone_verified: phoneVerified,
       identity_verified: user.identity_verified,
       profile_completed: profileCompleted,
       created_at: user.created_at,
@@ -136,7 +146,15 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const current = await this.findById(userId);
     const updateData = this.buildProfileUpdateData(dto);
+
+    if (dto.phone_number !== undefined) {
+      const nextPhoneNumber = this.normalizeOptionalString(dto.phone_number);
+      if (nextPhoneNumber !== current.phone_number) {
+        updateData.phone_verified = false;
+      }
+    }
 
     if (Object.keys(updateData).length > 0) {
       await this.usersRepository.update(userId, updateData);
@@ -144,19 +162,52 @@ export class UsersService {
 
     const updated = await this.findById(userId);
     const completionData = {
-      phone_verified: Boolean(updated.phone_number),
       profile_completed: this.isProfileCompleted(updated),
     };
 
-    if (
-      completionData.phone_verified !== updated.phone_verified ||
-      completionData.profile_completed !== updated.profile_completed
-    ) {
+    if (completionData.profile_completed !== updated.profile_completed) {
       await this.usersRepository.update(userId, completionData);
       Object.assign(updated, completionData);
     }
 
     return this.toPrivateUser(updated);
+  }
+
+  async sendPhoneOtp(dto: SendPhoneOtpDto) {
+    this.assertOtpMockAvailable();
+    const phoneNumber = this.normalizeOptionalString(dto.phone_number);
+
+    if (!phoneNumber) {
+      throw new BadRequestException('Vui lòng nhập số điện thoại.');
+    }
+
+    return { message: 'Mã OTP đã được gửi.' };
+  }
+
+  async verifyPhoneOtp(userId: string, dto: VerifyPhoneOtpDto) {
+    this.assertOtpMockAvailable();
+    const phoneNumber = this.normalizeOptionalString(dto.phone_number);
+
+    if (!phoneNumber) {
+      throw new BadRequestException('Vui lòng nhập số điện thoại.');
+    }
+
+    if (dto.code?.trim() !== DEMO_PHONE_OTP) {
+      throw new BadRequestException('Mã OTP không chính xác.');
+    }
+
+    const user = await this.findById(userId);
+    user.phone_number = phoneNumber;
+    user.phone_verified = true;
+    user.profile_completed = this.isProfileCompleted(user);
+
+    await this.usersRepository.update(userId, {
+      phone_number: user.phone_number,
+      phone_verified: user.phone_verified,
+      profile_completed: user.profile_completed,
+    });
+
+    return this.toPrivateUser(user);
   }
 
   async getPrivateById(userId: string) {
@@ -177,6 +228,7 @@ export class UsersService {
       user.full_name?.trim() &&
       user.avatar_url?.trim() &&
       user.phone_number?.trim() &&
+      user.phone_verified &&
       user.date_of_birth &&
       user.city?.trim() &&
       user.emergency_contact_phone?.trim(),
@@ -236,6 +288,14 @@ export class UsersService {
   private normalizeOptionalString(value: string) {
     const trimmed = value.trim();
     return trimmed || null;
+  }
+
+  private assertOtpMockAvailable() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException(
+        'OTP mock chỉ được dùng trong môi trường development.',
+      );
+    }
   }
 
   private async getTripReliability(userId: string): Promise<TripReliability> {

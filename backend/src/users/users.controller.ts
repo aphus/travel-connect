@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { SendPhoneOtpDto } from './dto/send-phone-otp.dto';
+import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 
 @Controller('users')
 export class UsersController {
@@ -22,6 +24,21 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/phone/send-otp')
+  sendPhoneOtp(@Body() dto: SendPhoneOtpDto) {
+    return this.usersService.sendPhoneOtp(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/phone/verify-otp')
+  verifyPhoneOtp(
+    @CurrentUser() user: { sub: string },
+    @Body() dto: VerifyPhoneOtpDto,
+  ) {
+    return this.usersService.verifyPhoneOtp(user.sub, dto);
   }
 
   @Public()

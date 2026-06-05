@@ -109,6 +109,22 @@ export async function updateCurrentUser(payload: {
   return normalizeAuthUser(user);
 }
 
+export function sendPhoneOtp(phoneNumber: string) {
+  return fetchWrapper<{ message: string }>("/users/me/phone/send-otp", {
+    method: "POST",
+    body: JSON.stringify({ phone_number: phoneNumber }),
+  });
+}
+
+export async function verifyPhoneOtp(phoneNumber: string, code: string) {
+  const user = await fetchWrapper<RawAuthUser>("/users/me/phone/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ phone_number: phoneNumber, code }),
+  });
+
+  return normalizeAuthUser(user);
+}
+
 export function storeAuthUser(user: AuthUser, notify = true) {
   if (typeof window === "undefined") return;
 
