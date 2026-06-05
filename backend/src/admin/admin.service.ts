@@ -248,6 +248,14 @@ export class AdminService {
     );
 
     await this.usersRepository.save(request.user);
+    await this.notificationsService.create({
+      userId: request.user.id,
+      type: NotificationType.SYSTEM_WARNING,
+      title: 'Hồ sơ định danh đã được duyệt',
+      message:
+        'Hồ sơ định danh nâng cao của bạn đã được quản trị viên duyệt. Bạn có thể tạo và tham gia chuyến đi nếu hồ sơ tin cậy đã hoàn thiện.',
+      targetUrl: '/profile',
+    });
     await this.cleanupIdentityDocument(request);
     await this.identityVerificationRequestsRepository.save(request);
 
@@ -270,6 +278,15 @@ export class AdminService {
     request.user.profile_completed = false;
 
     await this.usersRepository.save(request.user);
+    await this.notificationsService.create({
+      userId: request.user.id,
+      type: NotificationType.SYSTEM_WARNING,
+      title: 'Hồ sơ định danh chưa được duyệt',
+      message: request.reject_reason
+        ? `Hồ sơ định danh nâng cao của bạn chưa được duyệt. Lý do: ${request.reject_reason}`
+        : 'Hồ sơ định danh nâng cao của bạn chưa được duyệt. Vui lòng kiểm tra lại tài liệu và gửi lại.',
+      targetUrl: '/profile',
+    });
     await this.cleanupIdentityDocument(request);
     await this.identityVerificationRequestsRepository.save(request);
 
