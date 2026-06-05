@@ -252,6 +252,12 @@ export default function PublicProfilePage() {
           Về {shortName}
         </button>
         <button
+          onClick={() => setActiveTab("reviews")}
+          className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "reviews" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          Đánh giá
+        </button>
+        <button
           onClick={() => setActiveTab("upcoming")}
           className={`pb-4 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === "upcoming" ? "border-b-2 border-slate-900 text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
         >
@@ -416,7 +422,20 @@ export default function PublicProfilePage() {
 
         {activeTab === "reviews" && (
           <div className="animate-in fade-in duration-300">
-            <UserReviews reviews={reviews} />
+            {reviews.length > 0 ? (
+              <UserReviews reviews={reviews} />
+            ) : (
+              <Card className="border-slate-200 shadow-sm border-dashed">
+                <CardContent className="p-16 flex flex-col items-center justify-center text-slate-500 text-center">
+                  <h3 className="text-lg font-bold text-slate-700 mb-1">
+                    Chưa có đánh giá
+                  </h3>
+                  <p className="text-sm">
+                    Người dùng này chưa có đánh giá nào.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
