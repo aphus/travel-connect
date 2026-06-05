@@ -129,7 +129,7 @@ export default function TripActionPanel({
         trustScore: getTrustScore(user),
       };
     })
-    .filter((member) => Boolean(member.id));
+    .filter((member) => Boolean(member.id) && member.id !== leader.id);
 
   const canJoin = status === "UPCOMING";
   const canManageBeforeTrip = status === "UPCOMING";

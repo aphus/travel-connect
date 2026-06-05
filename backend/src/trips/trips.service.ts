@@ -42,6 +42,20 @@ type TripMemberResponse = {
   joinedAt: Date;
 };
 
+type PublicTripMemberResponse = {
+  id: string;
+  role: MemberRole;
+  joined_at: Date;
+  user: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    trust_score: number;
+    identity_verified: boolean;
+    profile_completed: boolean;
+  };
+};
+
 const VIETNAMESE_SEARCH_CHARS =
   'ÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬáàảãạăắằẳẵặâấầẩẫậÉÈẺẼẸÊẾỀỂỄỆéèẻẽẹêếềểễệÍÌỈĨỊíìỉĩịÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢóòỏõọôốồổỗộơớờởỡợÚÙỦŨỤƯỨỪỬỮỰúùủũụưứừửữựÝỲỶỸỴýỳỷỹỵĐđ';
 const VIETNAMESE_SEARCH_REPLACEMENTS =
@@ -273,7 +287,51 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
       : trip.destination;
   }
 
-  private toPublicTrip(trip: Trip) {
+  private toPublicTripMemberUser(user: User) {
+    return {
+      id: user.id,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
+      trust_score: Number(user.trust_score),
+      identity_verified: user.identity_verified,
+      profile_completed: user.profile_completed,
+    };
+  }
+
+  private toPublicTripMembers(trip: Trip): PublicTripMemberResponse[] {
+    const members = (trip.members ?? [])
+      .filter((member) => Boolean(member.user))
+      .map((member): PublicTripMemberResponse => ({
+        id: member.id,
+        role:
+          member.user.id === trip.leaderId ? MemberRole.LEADER : member.role,
+        joined_at: member.joined_at,
+        user: this.toPublicTripMemberUser(member.user),
+      }));
+
+    const hasLeader = members.some(
+      (member) => member.user.id === trip.leaderId,
+    );
+
+    if (!hasLeader && trip.leader) {
+      members.unshift({
+        id: `leader-${trip.leader.id}`,
+        role: MemberRole.LEADER,
+        joined_at: trip.createdAt,
+        user: this.toPublicTripMemberUser(trip.leader),
+      });
+    }
+
+    return members.sort((left, right) => {
+      if (left.role !== right.role) {
+        return left.role === MemberRole.LEADER ? -1 : 1;
+      }
+
+      return left.joined_at.getTime() - right.joined_at.getTime();
+    });
+  }
+
+  private toPublicTrip(trip: Trip, includeMembers = false) {
     return {
       id: trip.id,
       destination: trip.destination,
@@ -295,8 +353,11 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
           full_name: trip.leader.full_name,
           avatar_url: trip.leader.avatar_url,
           trust_score: Number(trip.leader.trust_score),
+          identity_verified: trip.leader.identity_verified,
+          profile_completed: trip.leader.profile_completed,
         }
         : null,
+      ...(includeMembers ? { members: this.toPublicTripMembers(trip) } : {}),
     };
   }
 
@@ -304,9 +365,10 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
     trip: Trip,
     stats: TripStats,
     extra: Record<string, unknown> = {},
+    includeMembers = false,
   ) {
     return {
-      ...this.toPublicTrip(trip),
+      ...this.toPublicTrip(trip, includeMembers),
       currentMembers: Math.max(stats.currentMembers, 1),
       pendingRequests: stats.pendingRequests,
       ...extra,
@@ -391,10 +453,18 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
     return stats;
   }
 
-  private createPublicTripsQuery() {
-    return this.tripsRepository
+  private createPublicTripsQuery(includeMembers = false) {
+    const query = this.tripsRepository
       .createQueryBuilder('trip')
       .leftJoinAndSelect('trip.leader', 'leader');
+
+    if (includeMembers) {
+      query
+        .leftJoinAndSelect('trip.members', 'member')
+        .leftJoinAndSelect('member.user', 'memberUser');
+    }
+
+    return query;
   }
 
   private scoreTripSearch(
@@ -670,7 +740,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async findPublicOne(id: string) {
-    const trip = await this.createPublicTripsQuery()
+    const trip = await this.createPublicTripsQuery(true)
       .where('trip.id = :id', { id })
       .getOne();
 
@@ -684,6 +754,8 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
     return this.toPublicTripWithStats(
       trip,
       stats.get(trip.id) ?? { currentMembers: 1, pendingRequests: 0 },
+      {},
+      true,
     );
   }
 
