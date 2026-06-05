@@ -69,6 +69,12 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    if (dto.acceptTerms !== true) {
+      throw new BadRequestException(
+        'Bạn cần đồng ý với Điều khoản sử dụng và Chính sách bảo mật để đăng ký.',
+      );
+    }
+
     const existingUser = await this.usersService.findByEmail(dto.email);
     if (existingUser) {
       throw new ConflictException('Email đã được sử dụng');

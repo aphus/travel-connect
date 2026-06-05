@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Mail, Lock, User, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ export default function RegisterForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [acceptTerms, setAcceptTerms] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
@@ -37,6 +39,11 @@ export default function RegisterForm() {
         e.preventDefault();
         setErrorMessage("");
 
+        if (!acceptTerms) {
+            setErrorMessage("Vui lòng đồng ý với Điều khoản sử dụng và Chính sách bảo mật trước khi đăng ký.");
+            return;
+        }
+
         if (password !== confirmPassword) {
             setErrorMessage("Mật khẩu nhập lại không khớp");
             return;
@@ -49,6 +56,7 @@ export default function RegisterForm() {
                 fullName: fullName.trim(),
                 email: email.trim(),
                 password,
+                acceptTerms: true,
             });
 
             storeAuthUser(response.user);
@@ -121,6 +129,26 @@ export default function RegisterForm() {
                 </div>
             </div>
 
+            <label className="flex items-start gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-medium text-white/85">
+                <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-white/40 bg-white/20 text-blue-600 accent-blue-600"
+                />
+                <span>
+                    Tôi đã đọc và đồng ý với{" "}
+                    <Link href="/terms" className="font-bold text-white underline underline-offset-4 hover:text-blue-100">
+                        Điều khoản sử dụng
+                    </Link>{" "}
+                    và{" "}
+                    <Link href="/privacy" className="font-bold text-white underline underline-offset-4 hover:text-blue-100">
+                        Chính sách bảo mật
+                    </Link>{" "}
+                    của TripConnect.
+                </span>
+            </label>
+
             {errorMessage && (
                 <p className="rounded-xl bg-red-500/15 border border-red-300/30 px-4 py-3 text-sm font-medium text-red-100" role="alert" aria-live="polite">
                     {errorMessage}
@@ -130,7 +158,8 @@ export default function RegisterForm() {
             <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-2xl shadow-xl transition-all mt-4 disabled:opacity-70"
+                aria-disabled={!acceptTerms}
+                className={`w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-2xl shadow-xl transition-all mt-4 disabled:opacity-70 ${acceptTerms ? "" : "opacity-60"}`}
             >
                 {isSubmitting ? "ĐANG TẠO..." : (
                     <>TẠO TÀI KHOẢN <UserPlus className="ml-2 h-5 w-5" /></>
