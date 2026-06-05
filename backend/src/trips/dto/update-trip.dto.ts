@@ -17,6 +17,11 @@ export class UpdateTripDto {
   destination?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  destinationPlace?: string;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 

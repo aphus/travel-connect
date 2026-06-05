@@ -1,8 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Map, AlertOctagon, Trash2, CheckCircle2, Eye, Loader2, Clock } from "lucide-react";
-import { getAllTrips, cancelTripAsAdmin, type AdminTrip } from "@/services/admin";
+import { Search, Map, AlertOctagon, Trash2, CheckCircle2, Eye, Loader2 } from "lucide-react";
+import {
+    cancelTripAsAdmin,
+    getAdminTripDestinationLabel,
+    getAllTrips,
+    type AdminTrip,
+} from "@/services/admin";
 import TripDetailsModal from "@/components/admin/trips/TripDetailsModal";
 
 export default function AdminTripsPage() {
@@ -13,11 +18,9 @@ export default function AdminTripsPage() {
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [selectedTrip, setSelectedTrip] = useState<AdminTrip | null>(null);
 
-    useEffect(() => {
-        loadTrips();
-    }, []);
+    async function loadTrips() {
+        await Promise.resolve();
 
-    const loadTrips = async () => {
         try {
             setIsLoading(true);
             const data = await getAllTrips();
@@ -27,7 +30,15 @@ export default function AdminTripsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            void loadTrips();
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
+    }, []);
 
     const handleCancelTrip = async (tripId: string) => {
         if (!window.confirm("Bạn có chắc chắn muốn HỦY chuyến đi này? Hành động này không thể hoàn tác!")) {
@@ -48,7 +59,7 @@ export default function AdminTripsPage() {
     };
 
     const filteredTrips = trips.filter(trip =>
-        (trip.destination || "").toLowerCase().includes(searchTerm.toLowerCase())
+        getAdminTripDestinationLabel(trip).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -99,7 +110,7 @@ export default function AdminTripsPage() {
                                                 <Map className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <p className="font-bold text-slate-800 line-clamp-1">{trip.destination}</p>
+                                                <p className="font-bold text-slate-800 line-clamp-1">{getAdminTripDestinationLabel(trip)}</p>
 
                                                 <p className="text-slate-500 text-xs mt-0.5">Leader ID: <span className="font-medium text-slate-700">{trip.leaderId ? trip.leaderId.substring(0, 8) + '...' : 'N/A'}</span></p>
                                             </div>

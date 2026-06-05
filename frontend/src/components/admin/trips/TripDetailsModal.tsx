@@ -1,6 +1,6 @@
 import React from "react";
 import { X, MapPin, Calendar, Users, DollarSign, AlignLeft, Shield, User } from "lucide-react";
-import { AdminTrip } from "@/services/admin";
+import { AdminTrip, getAdminTripDestinationLabel } from "@/services/admin";
 
 interface TripDetailsModalProps {
     isOpen: boolean;
@@ -22,7 +22,7 @@ export default function TripDetailsModal({ isOpen, onClose, trip }: TripDetailsM
                             <MapPin className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-800 line-clamp-1">{trip.destination || "Chuyến đi chưa có tên"}</h3>
+                            <h3 className="text-xl font-black text-slate-800 line-clamp-1">{getAdminTripDestinationLabel(trip) || "Chuyến đi chưa có tên"}</h3>
                             <p className="text-xs text-slate-500 font-mono">ID: {trip.id}</p>
                         </div>
                     </div>

@@ -37,6 +37,44 @@ export function loginUser(payload: { email: string; password: string }) {
   });
 }
 
+export function changePassword(payload: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  return fetchWrapper<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function requestPasswordReset(payload: { email: string }) {
+  return fetchWrapper<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function verifyResetOtp(payload: { email: string; otp: string }) {
+  return fetchWrapper<{ message: string }>("/auth/verify-reset-otp", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function resetPasswordWithOtp(payload: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}) {
+  return fetchWrapper<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getCurrentUser() {
   const user = await fetchWrapper<RawAuthUser>("/users/me");
   return normalizeAuthUser(user);
@@ -109,7 +147,7 @@ export function setAuthFlash(
 
 export function getAuthErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
-    if (error.status === 409) return "Email đã được sử dụng";
+    if (error.status === 409) return error.message || "Email đã được sử dụng";
     if (error.status === 401) return "Sai mật khẩu";
     if (error.status === 403) return "Tài khoản đã bị khóa";
 

@@ -1,10 +1,11 @@
 import React from 'react';
 import Link from 'next/link';
-import { Calendar, DollarSign, Users } from 'lucide-react';
+import { Calendar, DollarSign, MapPin, Users } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { JoinStatus } from '@/services/trips';
 
 // 1. Định nghĩa cấu trúc dữ liệu (Props) mà thẻ này sẽ nhận vào
@@ -30,32 +31,76 @@ export interface Trip {
 
 interface TripCardProps {
     trip: Trip;
+    variant?: "default" | "feed";
 }
 
-export default function TripCard({ trip }: TripCardProps) {
+export default function TripCard({ trip, variant = "default" }: TripCardProps) {
     // Logic kiểm tra nhóm đã đủ người chưa
     const isFull = trip.currentMembers >= trip.maxMembers;
     const isCompleted = trip.status === 'completed';
     const joinButtonMeta = getJoinButtonMeta(trip.joinStatus, isFull, isCompleted);
+    const isFeed = variant === "feed";
 
     return (
-        <Link href={`/trips/${trip.id}`} className="block h-full cursor-pointer hover:-translate-y-1 transition-transform duration-300">
-            <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full border-slate-200">
-
-                {/* ... (Toàn bộ code hiển thị ảnh, tiêu đề, ngày tháng, leader bên trong giữ nguyên y hệt như cũ) ... */}
-
-                <div className="relative h-48 w-full bg-slate-100">
+        <Link
+            href={`/trips/${trip.id}`}
+            className={cn(
+                "block h-full cursor-pointer transition-transform duration-300",
+                isFeed ? "hover:-translate-y-0.5" : "hover:-translate-y-1",
+            )}
+        >
+            <Card
+                className={cn(
+                    "flex h-full flex-col overflow-hidden border-slate-200 transition-shadow duration-300 hover:shadow-lg",
+                    isFeed && "rounded-xl shadow-sm",
+                )}
+            >
+                <div
+                    className={cn(
+                        "relative w-full bg-slate-100",
+                        isFeed ? "aspect-[16/9]" : "h-48",
+                    )}
+                >
                     <img
                         src={trip.coverUrl || "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80"}
                         alt={trip.title}
                         className="object-cover w-full h-full"
                     />
-                    <Badge className="absolute top-3 right-3 bg-white/90 text-blue-600 hover:bg-white shadow-sm border-none">{trip.location}</Badge>
+                    {!isFeed && (
+                        <Badge className="absolute top-3 right-3 bg-white/90 text-blue-600 hover:bg-white shadow-sm border-none">
+                            {trip.location}
+                        </Badge>
+                    )}
                 </div>
 
-                <CardContent className="p-5 flex-1">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4 line-clamp-2 leading-tight">{trip.title}</h3>
-                    <div className="space-y-2.5 text-sm text-slate-600 font-medium">
+                <CardContent className={cn("flex-1 p-5", isFeed && "p-5 sm:p-6")}>
+                    <h3
+                        className={cn(
+                            "mb-4 line-clamp-2 font-bold leading-tight text-slate-900",
+                            isFeed ? "text-2xl" : "text-xl",
+                        )}
+                    >
+                        {trip.title}
+                    </h3>
+                    <div
+                        className={cn(
+                            "text-sm font-medium text-slate-600",
+                            isFeed ? "grid gap-3 sm:grid-cols-2" : "space-y-2.5",
+                        )}
+                    >
+                        <div
+                            className={cn(
+                                "flex items-start gap-3",
+                                isFeed && "sm:col-span-2",
+                            )}
+                        >
+                            <div className="rounded-md bg-rose-50 p-1.5">
+                                <MapPin className="h-4 w-4 text-rose-600" />
+                            </div>
+                            <span className="line-clamp-2 font-semibold text-slate-700">
+                                {trip.location}
+                            </span>
+                        </div>
                         <div className="flex items-center gap-3">
                             <div className="bg-blue-50 p-1.5 rounded-md"><Calendar className="w-4 h-4 text-blue-600" /></div>
                             <span>{trip.startDate} - {trip.endDate}</span>
@@ -64,7 +109,7 @@ export default function TripCard({ trip }: TripCardProps) {
                             <div className="bg-green-50 p-1.5 rounded-md"><DollarSign className="w-4 h-4 text-green-600" /></div>
                             <span>{trip.budget}</span>
                         </div>
-                        <div className="flex items-center justify-between mt-4">
+                        <div className={cn("flex items-center justify-between", !isFeed && "mt-4")}>
                             <div className="flex items-center gap-3">
                                 <div className="bg-orange-50 p-1.5 rounded-md"><Users className="w-4 h-4 text-orange-600" /></div>
                                 <span>{trip.currentMembers} / {trip.maxMembers} thành viên</span>
@@ -76,7 +121,12 @@ export default function TripCard({ trip }: TripCardProps) {
                     </div>
                 </CardContent>
 
-                <CardFooter className="p-5 border-t bg-slate-50 flex items-center justify-between mt-auto">
+                <CardFooter
+                    className={cn(
+                        "mt-auto flex items-center justify-between border-t bg-slate-50 p-5",
+                        isFeed && "p-4 sm:px-6",
+                    )}
+                >
                     <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10 border border-slate-200 shadow-sm">
                             <AvatarImage src={trip.leader.avatarUrl} alt={trip.leader.name} />

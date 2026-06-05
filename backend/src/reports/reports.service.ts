@@ -186,6 +186,7 @@ export class ReportsService {
       id: true,
       leaderId: true,
       destination: true,
+      destinationPlace: true,
       startDate: true,
       endDate: true,
       status: true,

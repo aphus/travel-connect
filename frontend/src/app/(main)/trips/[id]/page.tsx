@@ -6,6 +6,7 @@ import TripDetail from "@/components/trip/TripDetail";
 import { MapPin } from "lucide-react";
 import {
     getTrip,
+    getTripDestinationLabel,
     getTripRelation,
     tripToDetailData,
     type Trip,
@@ -101,7 +102,7 @@ export default function TripPage() {
                     </h1>
                     <div className="flex items-center gap-2 text-base md:text-lg font-medium text-slate-200">
                         <MapPin className="h-5 w-5 text-rose-500" />
-                        {trip.destination}
+                        {getTripDestinationLabel(trip)}
                     </div>
                 </div>
             </div>

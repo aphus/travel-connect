@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AlertTriangle, X, Clock, CheckCircle2, User, MapPin, ShieldAlert, Ban, Send, Check } from "lucide-react";
 import { AdminReport } from "@/services/admin";
 import { fetchWrapper } from "@/services/fetchWrapper";
+import { formatTripDestination } from "@/lib/vietnam-destinations";
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -76,7 +77,12 @@ export default function ReportModal({ isOpen, onClose, reportsList }: ReportModa
                             <div className="space-y-4">
                                 {pendingReports.map((report) => {
                                     const reportedName = report.reported?.full_name || report.reported?.email || "N/A";
-                                    const tripDest = report.trip?.destination || "N/A";
+                                    const tripDest = report.trip
+                                        ? formatTripDestination(
+                                            report.trip.destination || "",
+                                            report.trip.destinationPlace ?? report.trip.destination_place ?? null,
+                                        ) || "N/A"
+                                        : "N/A";
                                     const reportDate = report.created_at;
                                     const reasonText = REASON_MAP[report.reason] || report.reason;
 
@@ -109,7 +115,7 @@ export default function ReportModal({ isOpen, onClose, reportsList }: ReportModa
                                             <div>
                                                 <p className="text-sm text-slate-800 font-bold mt-1">Lý do: <span className="text-rose-600 font-medium">{reasonText}</span></p>
                                                 {report.description && (
-                                                    <p className="text-sm text-slate-600 mt-1 italic">"{report.description}"</p>
+                                                    <p className="text-sm text-slate-600 mt-1 italic">&ldquo;{report.description}&rdquo;</p>
                                                 )}
                                             </div>
 

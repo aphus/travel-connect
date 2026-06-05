@@ -78,6 +78,10 @@ export class UsersService {
     return this.toPublicUser(updated);
   }
 
+  async updatePassword(userId: string, passwordHash: string) {
+    await this.usersRepository.update(userId, { password_hash: passwordHash });
+  }
+
   async getPublicById(userId: string) {
     const user = await this.findById(userId);
     return this.toPublicUser(user);

@@ -43,6 +43,9 @@ export class User {
   @Column({ name: 'trips_created', type: 'int', default: 0 })
   tripsCreated!: number;
 
+  @Column({ type: 'timestamp', nullable: true })
+  banned_until!: Date | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

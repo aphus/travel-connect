@@ -17,6 +17,11 @@ export class CreateTripDto {
   @MaxLength(120)
   destination: string;
 
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(160)
+  destinationPlace: string;
+
   @IsDateString()
   startDate: string;
 

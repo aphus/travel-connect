@@ -1,4 +1,5 @@
 import { fetchWrapper } from "./fetchWrapper";
+import { formatTripDestination } from "@/lib/vietnam-destinations";
 
 export type AdminUser = {
     id: string;
@@ -30,6 +31,8 @@ export async function toggleUserBan(userId: string, isBanned: boolean) {
 export type AdminTrip = {
     id: string;
     destination: string;
+    destinationPlace?: string | null;
+    destination_place?: string | null;
     leaderId: string;
     startDate: string;
     endDate: string;
@@ -67,7 +70,7 @@ export async function cancelTripAsAdmin(tripId: string) {
 
 
 export async function getAllReports() {
-    return fetchWrapper<any[]>("/admin/reports", {
+    return fetchWrapper<AdminReport[]>("/admin/reports", {
         method: "GET",
     });
 }
@@ -87,5 +90,14 @@ export type AdminReport = {
     created_at?: string;
     reporter?: { id: string; email: string; full_name?: string };
     reported?: { id: string; email: string; full_name?: string };
-    trip?: { id: string; destination?: string };
+    trip?: { id: string; destination?: string; destinationPlace?: string | null; destination_place?: string | null };
 };
+
+export function getAdminTripDestinationLabel(
+    trip: Pick<AdminTrip, "destination" | "destinationPlace" | "destination_place">,
+) {
+    return formatTripDestination(
+        trip.destination,
+        trip.destinationPlace ?? trip.destination_place ?? null,
+    );
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -10,12 +10,12 @@ import {
     ArrowLeft,
     DollarSign,
     Loader2,
-    MapPin,
     Save,
     Type,
     Users,
 } from "lucide-react";
 
+import { TripDestinationPicker } from "@/components/trip/TripDestinationPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,13 +28,21 @@ import {
     parseCurrencyInput,
     parsePositiveIntegerInput,
 } from "@/lib/trip-format";
+import {
+    formatTripDestination,
+    OTHER_DESTINATION_OPTION,
+    parseTripDestination,
+    resolveTripDestinationPlace,
+} from "@/lib/vietnam-destinations";
 import { setAuthFlash } from "@/services/auth";
 import { ApiError } from "@/services/fetchWrapper";
 import { getTrip, updateTrip } from "@/services/trips";
 
 const editTripSchema = z.object({
     title: z.string().min(10, { message: "Tên chuyến đi cần ít nhất 10 ký tự" }),
-    location: z.string().min(2, { message: "Vui lòng nhập địa điểm" }),
+    province: z.string().min(2, { message: "Vui lòng chọn tỉnh/thành phố" }),
+    destinationPlace: z.string().min(2, { message: "Vui lòng chọn điểm đến cụ thể" }),
+    customDestination: z.string().optional(),
     budget: z.string()
         .min(1, { message: "Vui lòng nhập ngân sách" })
         .refine((value) => {
@@ -55,6 +63,13 @@ const editTripSchema = z.object({
 }).refine((data) => data.endDate >= data.startDate, {
     message: "Ngày về phải bằng hoặc sau ngày đi",
     path: ["endDate"],
+}).refine((data) => {
+    if (data.destinationPlace !== OTHER_DESTINATION_OPTION) return true;
+
+    return (data.customDestination ?? "").trim().length >= 2;
+}, {
+    message: "Vui lòng nhập điểm đến khác",
+    path: ["customDestination"],
 });
 
 type EditTripFormValues = z.infer<typeof editTripSchema>;
@@ -70,13 +85,17 @@ export default function EditTripPage() {
         register,
         handleSubmit,
         reset,
-        watch,
+        setValue,
+        clearErrors,
+        control,
         formState: { errors, isSubmitting },
     } = useForm<EditTripFormValues>({
         resolver: zodResolver(editTripSchema),
         defaultValues: {
             title: "",
-            location: "",
+            province: "",
+            destinationPlace: "",
+            customDestination: "",
             budget: "",
             maxMembers: "",
             description: "",
@@ -84,7 +103,10 @@ export default function EditTripPage() {
             endDate: "",
         },
     });
-    const selectedStartDate = watch("startDate");
+    const selectedStartDate = useWatch({ control, name: "startDate" });
+    const selectedProvince = useWatch({ control, name: "province" });
+    const selectedDestinationPlace = useWatch({ control, name: "destinationPlace" });
+    const customDestination = useWatch({ control, name: "customDestination" }) ?? "";
 
     useEffect(() => {
         let isActive = true;
@@ -99,12 +121,18 @@ export default function EditTripPage() {
 
                 const { title, body } = splitTripDescription(
                     trip.description,
+                    formatTripDestination(trip.destination, trip.destinationPlace),
+                );
+                const parsedDestination = parseTripDestination(
                     trip.destination,
+                    trip.destinationPlace,
                 );
 
                 reset({
                     title,
-                    location: trip.destination,
+                    province: parsedDestination.province,
+                    destinationPlace: parsedDestination.destinationPlace,
+                    customDestination: parsedDestination.customDestination,
                     budget: formatCurrencyInput(String(Math.round(trip.budget ?? 0))),
                     maxMembers: String(trip.maxMembers),
                     description: body || trip.description || "",
@@ -145,8 +173,14 @@ export default function EditTripPage() {
         }
 
         try {
+            const destinationPlace = resolveTripDestinationPlace(
+                data.destinationPlace,
+                data.customDestination,
+            );
+
             await updateTrip(params.id, {
-                destination: data.location.trim(),
+                destination: data.province.trim(),
+                destinationPlace,
                 startDate: data.startDate,
                 endDate: data.endDate,
                 budget,
@@ -215,16 +249,30 @@ export default function EditTripPage() {
                                 <FieldError message={errors.title?.message} />
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="location" className="font-semibold text-slate-700">
-                                    Địa điểm đến
-                                </Label>
-                                <div className="relative">
-                                    <MapPin className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                                    <Input id="location" className={`h-12 pl-11 ${errors.location ? "border-red-500" : ""}`} {...register("location")} />
-                                </div>
-                                <FieldError message={errors.location?.message} />
-                            </div>
+                            <TripDestinationPicker
+                                province={selectedProvince}
+                                destinationPlace={selectedDestinationPlace}
+                                customDestination={customDestination}
+                                provinceError={errors.province?.message}
+                                destinationPlaceError={errors.destinationPlace?.message}
+                                customDestinationError={errors.customDestination?.message}
+                                onProvinceChange={(province) => {
+                                    setValue("province", province, { shouldDirty: true, shouldValidate: true });
+                                    setValue("destinationPlace", "", { shouldDirty: true });
+                                    setValue("customDestination", "", { shouldDirty: true });
+                                    clearErrors(["destinationPlace", "customDestination"]);
+                                }}
+                                onDestinationPlaceChange={(destinationPlace) => {
+                                    setValue("destinationPlace", destinationPlace, { shouldDirty: true, shouldValidate: true });
+                                    if (destinationPlace !== OTHER_DESTINATION_OPTION) {
+                                        setValue("customDestination", "", { shouldDirty: true });
+                                        clearErrors("customDestination");
+                                    }
+                                }}
+                                onCustomDestinationChange={(value) => {
+                                    setValue("customDestination", value, { shouldDirty: true, shouldValidate: true });
+                                }}
+                            />
 
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                 <div className="space-y-2">

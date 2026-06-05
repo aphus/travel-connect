@@ -1,4 +1,5 @@
 import { fetchWrapper } from "./fetchWrapper";
+import { formatTripDestination } from "@/lib/vietnam-destinations";
 
 export type UserReview = {
   id: string;
@@ -14,6 +15,7 @@ export type UserReview = {
   trip: {
     id: string;
     destination: string;
+    destinationPlace?: string | null;
     startDate: string;
     endDate: string;
   } | null;
@@ -62,6 +64,8 @@ type RawUserReview = {
   trip?: {
     id: string;
     destination: string;
+    destinationPlace?: string | null;
+    destination_place?: string | null;
     startDate?: string;
     start_date?: string;
     endDate?: string;
@@ -121,7 +125,12 @@ function normalizeUserReview(review: RawUserReview): UserReview {
     trip: review.trip
       ? {
           id: review.trip.id,
-          destination: review.trip.destination,
+          destination: formatTripDestination(
+            review.trip.destination,
+            review.trip.destinationPlace ?? review.trip.destination_place ?? null,
+          ),
+          destinationPlace:
+            review.trip.destinationPlace ?? review.trip.destination_place ?? null,
           startDate: review.trip.startDate ?? review.trip.start_date ?? "",
           endDate: review.trip.endDate ?? review.trip.end_date ?? "",
         }

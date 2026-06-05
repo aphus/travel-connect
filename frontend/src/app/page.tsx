@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PlusCircle, Search, MapPin, DollarSign, Users } from "lucide-react";
+import { PlusCircle, Search, DollarSign, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TripCard from "@/components/trip/TripCard";
 import DestinationsCarousel from "@/components/home/DestinationsCarousel"; // 1. IMPORT COMPONENT MỚI
+import { TripSearchDestinationPicker } from "@/components/trip/TripSearchDestinationPicker";
 import {
   formatCurrencyInput,
   getTomorrowDateInputValue,
@@ -21,6 +22,7 @@ export default function MegaHomePage() {
   const router = useRouter();
 
   const [location, setLocation] = useState("");
+  const [destinationPlace, setDestinationPlace] = useState("");
   const [startDate, setStartDate] = useState("");
   const [budget, setBudget] = useState("");
   const [members, setMembers] = useState("");
@@ -94,7 +96,11 @@ export default function MegaHomePage() {
     }
 
     const params = new URLSearchParams();
-    if (location.trim()) params.set("destination", location.trim());
+    const trimmedLocation = location.trim();
+    const trimmedDestinationPlace = destinationPlace.trim();
+
+    if (trimmedLocation) params.set("destination", trimmedLocation);
+    if (trimmedDestinationPlace) params.set("destinationPlace", trimmedDestinationPlace);
     if (startDate) params.set("startDate", startDate);
     if (parsedBudget) params.set("budget", String(parsedBudget));
     if (parsedMembers) params.set("maxMembers", String(parsedMembers));
@@ -143,14 +149,14 @@ export default function MegaHomePage() {
       <div className="container mx-auto px-4 -mt-20 relative z-20 max-w-6xl">
         <form onSubmit={handleSearch} className="bg-white p-8 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
           <h2 className="text-xl font-bold text-rose-600 mb-6 text-center uppercase tracking-wide">Tìm kiếm bạn đồng hành du lịch</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase">Địa điểm</label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Bạn muốn đi đâu?" className="pl-9 h-12 bg-white border border-slate-200 focus-visible:ring-rose-500" />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <TripSearchDestinationPicker
+              province={location}
+              destinationPlace={destinationPlace}
+              onProvinceChange={setLocation}
+              onDestinationPlaceChange={setDestinationPlace}
+              className="md:col-span-2 lg:col-span-2"
+            />
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase">Ngày khởi hành</label>
               <Input type="date" min={minTripDate} value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-12 bg-white border border-slate-200 focus-visible:ring-rose-500 text-slate-600" />
@@ -176,6 +182,11 @@ export default function MegaHomePage() {
               <Search className="mr-2 h-5 w-5" /> Tìm kiếm ngay
             </Button>
           </div>
+          {searchError && (
+            <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+              {searchError}
+            </p>
+          )}
         </form>
       </div>
 
@@ -196,6 +207,10 @@ export default function MegaHomePage() {
 
         {isLoadingTrips ? (
           <div className="py-16 text-center text-slate-500">Đang tải chuyến đi...</div>
+        ) : tripsError ? (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-6 py-12 text-center font-semibold text-red-600">
+            {tripsError}
+          </div>
         ) : cardTrips.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {cardTrips.map((trip) => <TripCard key={trip.id} trip={trip} />)}
