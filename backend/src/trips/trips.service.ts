@@ -19,6 +19,7 @@ import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { FilterTripsDto } from './dto/filter-trips.dto';
 import { User } from '../users/entities/user.entity';
+import { UsersService } from '../users/users.service';
 import { JoinRequest, RequestStatus } from './entities/join_request.entity';
 import { MemberRole, TripMember } from './entities/trip_member.entity';
 import {
@@ -58,6 +59,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
     private readonly tripsRepository: Repository<Trip>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
   ) { }
 
   onModuleInit() {
@@ -456,6 +458,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async create(leaderId: string, dto: CreateTripDto) {
+    await this.usersService.assertCanCreateTrip(leaderId);
     this.validateTripDates(dto.startDate, dto.endDate);
 
     if (dto.startDate < this.getTodayDateString()) {
@@ -990,6 +993,7 @@ export class TripsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async createJoinRequest(tripId: string, userId: string, message?: string) {
+    await this.usersService.assertCanJoinTrip(userId);
     const trip = await this.createPublicTripsQuery()
       .where('trip.id = :tripId', { tripId })
       .getOne();

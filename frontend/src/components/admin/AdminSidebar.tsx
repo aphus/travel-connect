@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Map, AlertTriangle } from "lucide-react";
+import {
+    LayoutDashboard,
+    Users,
+    Map,
+    AlertTriangle,
+    ShieldCheck,
+} from "lucide-react";
 import { getAllReports } from "@/services/admin";
 
 export default function AdminSidebar() {
@@ -15,13 +21,16 @@ export default function AdminSidebar() {
             try {
                 const data = await getAllReports();
                 if (Array.isArray(data)) {
-                    const pending = data.filter((r: any) => r.status !== 'resolved' && r.status !== 'rejected');
+                    const pending = data.filter(
+                        (r: any) => r.status !== "resolved" && r.status !== "rejected",
+                    );
                     setPendingCount(pending.length);
                 }
             } catch (error) {
                 console.error("Lỗi tải báo cáo sidebar:", error);
             }
         };
+
         fetchReports();
     }, [pathname]);
 
@@ -29,7 +38,17 @@ export default function AdminSidebar() {
         { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
         { name: "Quản lý Người dùng", href: "/admin/users", icon: Users },
         { name: "Quản lý Chuyến đi", href: "/admin/trips", icon: Map },
-        { name: "Quản lý Báo cáo", href: "/admin/reports", icon: AlertTriangle, hasBadge: true }, // Đánh dấu thẻ cần có Badge
+        {
+            name: "Quản lý Báo cáo",
+            href: "/admin/reports",
+            icon: AlertTriangle,
+            hasBadge: true,
+        },
+        {
+            name: "Xác minh danh tính",
+            href: "/admin/identity-verifications",
+            icon: ShieldCheck,
+        },
     ];
 
     return (
@@ -44,14 +63,16 @@ export default function AdminSidebar() {
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname.startsWith(item.href);
+
                     return (
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-                                ? "bg-blue-600 text-white shadow-md"
-                                : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                                }`}
+                            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${
+                                isActive
+                                    ? "bg-blue-600 text-white shadow-md"
+                                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                            }`}
                         >
                             <div className="flex items-center gap-3">
                                 <Icon className="w-5 h-5" />

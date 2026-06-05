@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Report } from '../reports/entities/report.entity';
 import { Trip } from '../trips/entities/trip.entity';
@@ -8,6 +12,12 @@ import { TripsService } from '../trips/trips.service';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import {
+  IdentityVerificationRequest,
+  IdentityVerificationStatus,
+} from '../users/entities/identity-verification-request.entity';
+import { UploadService } from '../upload/upload.service';
+import { RejectIdentityVerificationDto } from './dto/reject-identity-verification.dto';
 
 @Injectable()
 export class AdminService {
@@ -18,10 +28,13 @@ export class AdminService {
     private readonly tripsRepository: Repository<Trip>,
     @InjectRepository(Report)
     private readonly reportsRepository: Repository<Report>,
+    @InjectRepository(IdentityVerificationRequest)
+    private readonly identityVerificationRequestsRepository: Repository<IdentityVerificationRequest>,
     private readonly usersService: UsersService,
     private readonly tripsService: TripsService,
     private readonly notificationsService: NotificationsService,
-  ) { }
+    private readonly uploadService: UploadService,
+  ) {}
 
   listUsers() {
     return this.usersRepository.find({
@@ -95,7 +108,9 @@ export class AdminService {
 
   async unbanUser(userId: string) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
 
     user.is_banned = false;
     user.banned_until = null;
@@ -117,7 +132,8 @@ export class AdminService {
       userId: user.id,
       type: NotificationType.SYSTEM_WARNING,
       title: 'Cảnh cáo vi phạm',
-      message: 'Tài khoản của bạn đã bị người dùng khác báo cáo do vi phạm tiêu chuẩn cộng đồng. Vui lòng tuân thủ quy định nếu không tài khoản sẽ bị khóa.',
+      message:
+        'Tài khoản của bạn đã bị người dùng khác báo cáo do vi phạm tiêu chuẩn cộng đồng. Vui lòng tuân thủ quy định nếu không tài khoản sẽ bị khóa.',
     });
 
     return { success: true, message: 'Đã gửi thông báo cảnh cáo' };
@@ -132,9 +148,9 @@ export class AdminService {
     const participatedTrips = await this.tripsRepository.find({
       where: {
         members: {
-          user: { id: userId }
+          user: { id: userId },
         },
-        leaderId: Not(userId)
+        leaderId: Not(userId),
       },
       order: { createdAt: 'DESC' },
     });
@@ -145,10 +161,13 @@ export class AdminService {
     };
   }
 
-  async sendTripNotification(tripId: string, payload: { type: string; message: string; broadcastToMembers: boolean }) {
+  async sendTripNotification(
+    tripId: string,
+    payload: { type: string; message: string; broadcastToMembers: boolean },
+  ) {
     const trip = await this.tripsRepository.findOne({
       where: { id: tripId },
-      relations: ['leader', 'members', 'members.user']
+      relations: ['leader', 'members', 'members.user'],
     });
 
     if (!trip) {
@@ -162,21 +181,23 @@ export class AdminService {
     }
 
     if (payload.broadcastToMembers && trip.members) {
-      trip.members.forEach(member => {
-        if (member.user && member.user.id) {
+      trip.members.forEach((member) => {
+        if (member.user?.id) {
           recipients.add(member.user.id);
         }
       });
     }
 
-    const notificationPromises = Array.from(recipients).map(userId =>
+    const notificationPromises = Array.from(recipients).map((userId) =>
       this.notificationsService.create({
-        userId: userId,
-        type: 'SYSTEM_WARNING' as any,
-        title: payload.broadcastToMembers ? 'Cảnh báo từ Ban Quản Trị' : 'Thông báo từ Hệ thống',
+        userId,
+        type: NotificationType.SYSTEM_WARNING,
+        title: payload.broadcastToMembers
+          ? 'Cảnh báo từ Ban Quản Trị'
+          : 'Thông báo từ Hệ thống',
         message: payload.message,
-        targetUrl: `/trips/${tripId}`
-      })
+        targetUrl: `/trips/${tripId}`,
+      }),
     );
 
     await Promise.all(notificationPromises);
@@ -184,9 +205,108 @@ export class AdminService {
     return {
       success: true,
       message: `Đã gửi thông báo thành công đến ${recipients.size} tài khoản.`,
-      sentCount: recipients.size
+      sentCount: recipients.size,
     };
   }
+
+  async listIdentityVerifications(status?: string) {
+    const where = status
+      ? { status: this.parseIdentityVerificationStatus(status) }
+      : {};
+
+    const requests = await this.identityVerificationRequestsRepository.find({
+      where,
+      relations: ['user'],
+      order: { submitted_at: 'DESC' },
+    });
+
+    return requests.map((request) => ({
+      id: request.id,
+      user: {
+        id: request.user.id,
+        full_name: request.user.full_name,
+        email: request.user.email,
+      },
+      document_url: request.document_url,
+      status: request.status,
+      submitted_at: request.submitted_at,
+      reject_reason: request.reject_reason,
+    }));
+  }
+
+  async approveIdentityVerification(requestId: string, adminId: string) {
+    const request = await this.findIdentityVerificationRequest(requestId);
+
+    request.status = IdentityVerificationStatus.APPROVED;
+    request.reviewed_by_id = adminId;
+    request.reviewed_at = new Date();
+    request.reject_reason = null;
+
+    request.user.identity_verified = true;
+    request.user.profile_completed = this.usersService.isProfileCompleted(
+      request.user,
+    );
+
+    await this.usersRepository.save(request.user);
+    await this.cleanupIdentityDocument(request);
+    await this.identityVerificationRequestsRepository.save(request);
+
+    return { message: 'Duyệt xác minh danh tính thành công.' };
+  }
+
+  async rejectIdentityVerification(
+    requestId: string,
+    adminId: string,
+    dto: RejectIdentityVerificationDto,
+  ) {
+    const request = await this.findIdentityVerificationRequest(requestId);
+
+    request.status = IdentityVerificationStatus.REJECTED;
+    request.reviewed_by_id = adminId;
+    request.reviewed_at = new Date();
+    request.reject_reason = dto.reason?.trim() || null;
+
+    request.user.identity_verified = false;
+    request.user.profile_completed = false;
+
+    await this.usersRepository.save(request.user);
+    await this.cleanupIdentityDocument(request);
+    await this.identityVerificationRequestsRepository.save(request);
+
+    return { message: 'Từ chối xác minh danh tính thành công.' };
+  }
+
+  private async findIdentityVerificationRequest(requestId: string) {
+    const request = await this.identityVerificationRequestsRepository.findOne({
+      where: { id: requestId },
+      relations: ['user'],
+    });
+
+    if (!request) {
+      throw new NotFoundException('Không tìm thấy yêu cầu xác minh danh tính');
+    }
+
+    return request;
+  }
+
+  private async cleanupIdentityDocument(request: IdentityVerificationRequest) {
+    if (request.document_public_id) {
+      await this.uploadService.deleteImage(request.document_public_id);
+    }
+
+    request.document_url = null;
+    request.document_public_id = null;
+  }
+
+  private parseIdentityVerificationStatus(status: string) {
+    if (
+      Object.values(IdentityVerificationStatus).includes(
+        status as IdentityVerificationStatus,
+      )
+    ) {
+      return status as IdentityVerificationStatus;
+    }
+
+    throw new BadRequestException('Trạng thái xác minh danh tính không hợp lệ');
+  }
 }
-
-

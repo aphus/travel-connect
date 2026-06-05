@@ -8,15 +8,18 @@ import { Report } from '../reports/entities/report.entity';
 import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../trips/trips.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { IdentityVerificationRequest } from '../users/entities/identity-verification-request.entity';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Trip, Report]),
+    TypeOrmModule.forFeature([User, Trip, Report, IdentityVerificationRequest]),
     UsersModule,
     TripsModule,
     NotificationsModule,
+    UploadModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],
 })
-export class AdminModule { }
+export class AdminModule {}
