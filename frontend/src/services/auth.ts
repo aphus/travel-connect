@@ -10,6 +10,19 @@ export type AuthUser = {
   tripsCreated: number;
   isBanned?: boolean;
   bio?: string | null;
+  phoneNumber?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  city?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  travelStyle?: string | null;
+  travelPreferences?: string | null;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  identityVerified?: boolean;
+  profileCompleted?: boolean;
+  bannedUntil?: string | null;
 };
 
 export type AuthResponse = {
@@ -57,13 +70,35 @@ export async function uploadImage(file: File) {
 export async function updateCurrentUser(payload: {
   fullName?: string;
   bio?: string;
-  avatarUrl?: string
+  avatarUrl?: string;
+  phoneNumber?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  city?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  travelStyle?: string | null;
+  travelPreferences?: string | null;
 }) {
-  const body: any = {};
+  const body: Record<string, string | null> = {};
   if (payload.fullName) body.full_name = payload.fullName;
   if (payload.bio !== undefined) body.bio = payload.bio;
   if (payload.avatarUrl !== undefined) {
     body.avatar_url = payload.avatarUrl;
+  }
+  if (payload.phoneNumber !== undefined) body.phone_number = payload.phoneNumber;
+  if (payload.dateOfBirth !== undefined) body.date_of_birth = payload.dateOfBirth;
+  if (payload.gender !== undefined) body.gender = payload.gender;
+  if (payload.city !== undefined) body.city = payload.city;
+  if (payload.emergencyContactName !== undefined) {
+    body.emergency_contact_name = payload.emergencyContactName;
+  }
+  if (payload.emergencyContactPhone !== undefined) {
+    body.emergency_contact_phone = payload.emergencyContactPhone;
+  }
+  if (payload.travelStyle !== undefined) body.travel_style = payload.travelStyle;
+  if (payload.travelPreferences !== undefined) {
+    body.travel_preferences = payload.travelPreferences;
   }
 
   const user = await fetchWrapper<RawAuthUser>("/users/me", {
@@ -134,6 +169,30 @@ type RawAuthUser = {
   isBanned?: boolean;
   is_banned?: boolean;
   bio?: string | null;
+  phoneNumber?: string | null;
+  phone_number?: string | null;
+  dateOfBirth?: string | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  city?: string | null;
+  emergencyContactName?: string | null;
+  emergency_contact_name?: string | null;
+  emergencyContactPhone?: string | null;
+  emergency_contact_phone?: string | null;
+  travelStyle?: string | null;
+  travel_style?: string | null;
+  travelPreferences?: string | null;
+  travel_preferences?: string | null;
+  emailVerified?: boolean;
+  email_verified?: boolean;
+  phoneVerified?: boolean;
+  phone_verified?: boolean;
+  identityVerified?: boolean;
+  identity_verified?: boolean;
+  profileCompleted?: boolean;
+  profile_completed?: boolean;
+  bannedUntil?: string | null;
+  banned_until?: string | null;
 };
 
 function normalizeAuthUser(user: RawAuthUser): AuthUser {
@@ -147,5 +206,20 @@ function normalizeAuthUser(user: RawAuthUser): AuthUser {
     tripsCreated: Number(user.tripsCreated ?? user.trips_created ?? 0),
     isBanned: user.isBanned ?? user.is_banned,
     bio: user.bio ?? null,
+    phoneNumber: user.phoneNumber ?? user.phone_number ?? null,
+    dateOfBirth: user.dateOfBirth ?? user.date_of_birth ?? null,
+    gender: user.gender ?? null,
+    city: user.city ?? null,
+    emergencyContactName:
+      user.emergencyContactName ?? user.emergency_contact_name ?? null,
+    emergencyContactPhone:
+      user.emergencyContactPhone ?? user.emergency_contact_phone ?? null,
+    travelStyle: user.travelStyle ?? user.travel_style ?? null,
+    travelPreferences: user.travelPreferences ?? user.travel_preferences ?? null,
+    emailVerified: user.emailVerified ?? user.email_verified,
+    phoneVerified: user.phoneVerified ?? user.phone_verified,
+    identityVerified: user.identityVerified ?? user.identity_verified,
+    profileCompleted: user.profileCompleted ?? user.profile_completed,
+    bannedUntil: user.bannedUntil ?? user.banned_until ?? null,
   };
 }

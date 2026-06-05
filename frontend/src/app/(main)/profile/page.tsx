@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
+    AlertTriangle,
     FolderPlus,
     Loader2,
     Award,
@@ -13,7 +14,11 @@ import {
     Calendar,
     Edit,
     CheckCircle2,
-    Camera
+    Camera,
+    Mail,
+    Phone,
+    ShieldCheck,
+    UserCheck
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -50,9 +55,77 @@ import TripCard from "@/components/trip/TripCard";
 const profileSchema = z.object({
     name: z.string().min(2, { message: "Tên phải có ít nhất 2 ký tự" }),
     bio: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    gender: z.string().optional(),
+    city: z.string().optional(),
+    emergencyContactName: z.string().optional(),
+    emergencyContactPhone: z.string().optional(),
+    travelStyle: z.string().optional(),
+    travelPreferences: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
+
+function getProfileFormDefaults(user: AuthUser): ProfileFormValues {
+    return {
+        name: user.fullName,
+        bio: user.bio || "",
+        phoneNumber: user.phoneNumber || "",
+        dateOfBirth: user.dateOfBirth || "",
+        gender: user.gender || "",
+        city: user.city || "",
+        emergencyContactName: user.emergencyContactName || "",
+        emergencyContactPhone: user.emergencyContactPhone || "",
+        travelStyle: user.travelStyle || "",
+        travelPreferences: user.travelPreferences || "",
+    };
+}
+
+function hasProfileValue(value?: string | null) {
+    return Boolean(value?.trim());
+}
+
+function getProfileCompletion(user: AuthUser | null) {
+    if (!user) return 0;
+
+    const fields = [
+        user.avatarUrl,
+        user.fullName,
+        user.phoneNumber,
+        user.dateOfBirth,
+        user.city,
+        user.emergencyContactPhone,
+        hasProfileValue(user.bio) ? user.bio : user.travelStyle,
+    ];
+    const completed = fields.filter((field) => hasProfileValue(field)).length;
+
+    return Math.round((completed / fields.length) * 100);
+}
+
+function TrustStatusItem({
+    icon: Icon,
+    label,
+    verified,
+}: {
+    icon: React.ElementType;
+    label: string;
+    verified: boolean;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center gap-3 min-w-0">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                    <Icon className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-semibold text-slate-700">{label}</span>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                {verified ? "Đã xác minh" : "Chưa xác minh"}
+            </span>
+        </div>
+    );
+}
 
 export default function EnhancedProfilePage() {
     const router = useRouter();
@@ -94,7 +167,7 @@ export default function EnhancedProfilePage() {
             setCurrentUser(updatedUser);
             storeAuthUser(updatedUser);
             setStatusMessage("Cập nhật ảnh đại diện thành công!");
-        } catch (error) {
+        } catch {
             setStatusMessage("Lỗi khi tải ảnh lên. Vui lòng thử lại.");
         } finally {
             setIsUploadingAvatar(false);
@@ -109,7 +182,18 @@ export default function EnhancedProfilePage() {
         formState: { errors, isSubmitting },
     } = useForm<ProfileFormValues>({
         resolver: zodResolver(profileSchema),
-        defaultValues: { name: "", bio: "" },
+        defaultValues: {
+            name: "",
+            bio: "",
+            phoneNumber: "",
+            dateOfBirth: "",
+            gender: "",
+            city: "",
+            emergencyContactName: "",
+            emergencyContactPhone: "",
+            travelStyle: "",
+            travelPreferences: "",
+        },
     });
 
     useEffect(() => {
@@ -122,7 +206,7 @@ export default function EnhancedProfilePage() {
 
                 setCurrentUser(user);
                 storeAuthUser(user);
-                reset({ name: user.fullName, bio: user.bio || "" });
+                reset(getProfileFormDefaults(user));
 
                 try {
                     // Gọi song song cả Reviews và Trips cho nhanh
@@ -179,10 +263,21 @@ export default function EnhancedProfilePage() {
     const onSubmit = async (data: ProfileFormValues) => {
         setStatusMessage("");
         try {
-            const updatedUser = await updateCurrentUser({ fullName: data.name.trim(), bio: data.bio });
+            const updatedUser = await updateCurrentUser({
+                fullName: data.name.trim(),
+                bio: data.bio,
+                phoneNumber: data.phoneNumber,
+                dateOfBirth: data.dateOfBirth,
+                gender: data.gender,
+                city: data.city,
+                emergencyContactName: data.emergencyContactName,
+                emergencyContactPhone: data.emergencyContactPhone,
+                travelStyle: data.travelStyle,
+                travelPreferences: data.travelPreferences,
+            });
             setCurrentUser(updatedUser);
             storeAuthUser(updatedUser);
-            reset({ name: updatedUser.fullName, bio: updatedUser.bio || "" });
+            reset(getProfileFormDefaults(updatedUser));
             setIsDialogOpen(false);
         } catch (error) {
             if (error instanceof ApiError && [401, 403].includes(error.status)) {
@@ -208,6 +303,8 @@ export default function EnhancedProfilePage() {
 
     const trustScore = currentUser?.trustScore ?? 0;
     const displayTrustScore = trustScore.toFixed(1);
+    const profileCompletion = getProfileCompletion(currentUser);
+    const isProfileReady = Boolean(currentUser?.profileCompleted);
 
     return (
         <div className="container max-w-5xl mx-auto px-4 py-10">
@@ -250,14 +347,15 @@ export default function EnhancedProfilePage() {
                         <h1 className="text-3xl font-bold text-slate-900">
                             {currentUser?.fullName ?? "TripConnect User"}
                         </h1>
-                        <span className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm shadow-blue-100">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+                        <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm ${isProfileReady ? "bg-emerald-600 text-white shadow-emerald-100" : "bg-amber-100 text-amber-800 shadow-amber-50"}`}>
+                            {isProfileReady ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                            {isProfileReady ? "Hồ sơ tin cậy" : "Cần bổ sung hồ sơ"}
                         </span>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-slate-600 mb-4">
                         <span className="flex items-center gap-1.5">
-                            <MapPin className="h-4 w-4 text-sky-600" /> Vietnam
+                            <MapPin className="h-4 w-4 text-sky-600" /> {currentUser?.city || "Chưa cập nhật thành phố"}
                         </span>
                         <span className="hidden md:inline text-slate-300">•</span>
                         <span className="flex items-center gap-1.5">
@@ -273,7 +371,7 @@ export default function EnhancedProfilePage() {
                                 <Edit className="h-4 w-4" /> Chỉnh sửa hồ sơ
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
+                        <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle className="text-xl font-bold">Cập nhật hồ sơ</DialogTitle>
                             </DialogHeader>
@@ -286,6 +384,40 @@ export default function EnhancedProfilePage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="bio" className="text-sm font-bold text-slate-700">Giới thiệu bản thân (Bio)</Label>
                                     <Textarea id="bio" placeholder="Chia sẻ một chút về đam mê du lịch của bạn..." rows={5} {...register("bio")} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phoneNumber" className="text-sm font-bold text-slate-700">Số điện thoại</Label>
+                                        <Input id="phoneNumber" placeholder="Ví dụ: 0901234567" {...register("phoneNumber")} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dateOfBirth" className="text-sm font-bold text-slate-700">Ngày sinh</Label>
+                                        <Input id="dateOfBirth" type="date" {...register("dateOfBirth")} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gender" className="text-sm font-bold text-slate-700">Giới tính</Label>
+                                        <Input id="gender" placeholder="Nam, nữ, khác..." {...register("gender")} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="city" className="text-sm font-bold text-slate-700">Thành phố</Label>
+                                        <Input id="city" placeholder="Ví dụ: TP. Hồ Chí Minh" {...register("city")} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="emergencyContactName" className="text-sm font-bold text-slate-700">Tên liên hệ khẩn cấp</Label>
+                                        <Input id="emergencyContactName" placeholder="Người thân hoặc bạn tin cậy" {...register("emergencyContactName")} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="emergencyContactPhone" className="text-sm font-bold text-slate-700">SĐT liên hệ khẩn cấp</Label>
+                                        <Input id="emergencyContactPhone" placeholder="Số có thể liên hệ khi cần" {...register("emergencyContactPhone")} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="travelStyle" className="text-sm font-bold text-slate-700">Phong cách du lịch</Label>
+                                    <Input id="travelStyle" placeholder="Tự túc, nghỉ dưỡng, khám phá, tiết kiệm..." {...register("travelStyle")} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="travelPreferences" className="text-sm font-bold text-slate-700">Sở thích / quy tắc khi đi chung</Label>
+                                    <Textarea id="travelPreferences" placeholder="Ví dụ: thích lịch trình rõ ràng, không hút thuốc, ưu tiên ngủ sớm..." rows={4} {...register("travelPreferences")} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email" className="text-sm font-bold text-slate-700">Email (Không thể đổi)</Label>
@@ -360,13 +492,89 @@ export default function EnhancedProfilePage() {
             <div className="min-h-[300px]">
                 {/* TAB: VỀ TÔI */}
                 {activeTab === "about" && (
-                    <div className="animate-in fade-in duration-300">
+                    <div className="animate-in fade-in duration-300 space-y-6">
+                        <Card className="border-slate-200 shadow-sm">
+                            <CardContent className="p-8">
+                                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                                            <h3 className="text-lg font-bold text-slate-900">Hồ sơ tin cậy</h3>
+                                        </div>
+                                        <p className="text-sm text-slate-500">
+                                            Hoàn thiện các thông tin cần thiết để tạo và tham gia chuyến đi an toàn hơn.
+                                        </p>
+                                    </div>
+                                    <div className="min-w-[180px]">
+                                        <div className="flex items-center justify-between text-sm font-semibold text-slate-700 mb-2">
+                                            <span>Hoàn thiện</span>
+                                            <span>{profileCompletion}%</span>
+                                        </div>
+                                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                            <div
+                                                className={`h-full rounded-full transition-all ${isProfileReady ? "bg-emerald-500" : "bg-amber-500"}`}
+                                                style={{ width: `${profileCompletion}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                                    <TrustStatusItem
+                                        icon={Mail}
+                                        label="Email"
+                                        verified={Boolean(currentUser?.emailVerified)}
+                                    />
+                                    <TrustStatusItem
+                                        icon={Phone}
+                                        label="Số điện thoại"
+                                        verified={Boolean(currentUser?.phoneVerified)}
+                                    />
+                                    <TrustStatusItem
+                                        icon={UserCheck}
+                                        label="Danh tính"
+                                        verified={Boolean(currentUser?.identityVerified)}
+                                    />
+                                    <TrustStatusItem
+                                        icon={ShieldCheck}
+                                        label="Hồ sơ"
+                                        verified={isProfileReady}
+                                    />
+                                </div>
+
+                                <div className={`mt-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${isProfileReady ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                                    {isProfileReady ? (
+                                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                                    ) : (
+                                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                    )}
+                                    <span>
+                                        {isProfileReady
+                                            ? "Hồ sơ của bạn đã đủ điều kiện tạo và tham gia chuyến đi."
+                                            : "Bạn cần hoàn thiện hồ sơ tin cậy trước khi tạo hoặc tham gia chuyến đi."}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         <Card className="border-slate-200 shadow-sm">
                             <CardContent className="p-8">
                                 <h3 className="text-lg font-bold text-slate-900 mb-4">Giới thiệu</h3>
                                 <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
                                     {currentUser?.bio ? currentUser.bio : "Chưa có thông tin giới thiệu. Hãy thêm vài dòng để mọi người hiểu hơn về bạn nhé!"}
                                 </div>
+                                {(currentUser?.travelStyle || currentUser?.travelPreferences) && (
+                                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-6">
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-900 mb-2">Phong cách du lịch</h4>
+                                            <p className="text-sm text-slate-600">{currentUser.travelStyle || "Chưa cập nhật"}</p>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-900 mb-2">Sở thích / quy tắc khi đi chung</h4>
+                                            <p className="text-sm text-slate-600 whitespace-pre-wrap">{currentUser.travelPreferences || "Chưa cập nhật"}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
