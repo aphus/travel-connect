@@ -67,7 +67,7 @@ export async function cancelTripAsAdmin(tripId: string) {
 
 
 export async function getAllReports() {
-    return fetchWrapper<any[]>("/admin/reports", {
+    return fetchWrapper<AdminReport[]>("/admin/reports", {
         method: "GET",
     });
 }
@@ -91,3 +91,49 @@ export type AdminReport = {
     previousReportCount?: number;
     accountStatus?: string;
 };
+
+export type IdentityVerificationStatus = "pending" | "approved" | "rejected";
+
+export type AdminIdentityVerificationRequest = {
+    id: string;
+    user: {
+        id: string;
+        full_name?: string;
+        fullName?: string;
+        email: string;
+    };
+    document_url: string | null;
+    status: IdentityVerificationStatus;
+    submitted_at: string;
+    reject_reason?: string | null;
+};
+
+export function getIdentityVerificationRequests(status?: IdentityVerificationStatus) {
+    const query = status ? `?status=${status}` : "";
+
+    return fetchWrapper<AdminIdentityVerificationRequest[]>(
+        `/admin/identity-verifications${query}`,
+        {
+            method: "GET",
+        },
+    );
+}
+
+export function approveIdentityVerification(id: string) {
+    return fetchWrapper<{ message: string }>(
+        `/admin/identity-verifications/${id}/approve`,
+        {
+            method: "PATCH",
+        },
+    );
+}
+
+export function rejectIdentityVerification(id: string, reason: string) {
+    return fetchWrapper<{ message: string }>(
+        `/admin/identity-verifications/${id}/reject`,
+        {
+            method: "PATCH",
+            body: JSON.stringify({ reason }),
+        },
+    );
+}

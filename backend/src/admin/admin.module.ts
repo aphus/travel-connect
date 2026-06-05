@@ -7,12 +7,15 @@ import { Trip } from '../trips/entities/trip.entity';
 import { Report } from '../reports/entities/report.entity';
 import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../trips/trips.module';
+import { IdentityVerificationRequest } from '../users/entities/identity-verification-request.entity';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Trip, Report]),
+    TypeOrmModule.forFeature([User, Trip, Report, IdentityVerificationRequest]),
     UsersModule,
     TripsModule,
+    UploadModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

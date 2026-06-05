@@ -1,9 +1,19 @@
-import { Controller, Get, Param, Patch, UseGuards, Body } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RejectIdentityVerificationDto } from './dto/reject-identity-verification.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
@@ -34,5 +44,27 @@ export class AdminController {
   @Get('reports')
   listReports() {
     return this.adminService.listReports();
+  }
+
+  @Get('identity-verifications')
+  listIdentityVerifications(@Query('status') status?: string) {
+    return this.adminService.listIdentityVerifications(status);
+  }
+
+  @Patch('identity-verifications/:id/approve')
+  approveIdentityVerification(
+    @Param('id') id: string,
+    @CurrentUser() admin: { sub: string },
+  ) {
+    return this.adminService.approveIdentityVerification(id, admin.sub);
+  }
+
+  @Patch('identity-verifications/:id/reject')
+  rejectIdentityVerification(
+    @Param('id') id: string,
+    @CurrentUser() admin: { sub: string },
+    @Body() dto: RejectIdentityVerificationDto,
+  ) {
+    return this.adminService.rejectIdentityVerification(id, admin.sub, dto);
   }
 }

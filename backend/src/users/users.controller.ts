@@ -8,6 +8,7 @@ import { SendPhoneOtpDto } from './dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 import { SendEmailOtpDto } from './dto/send-email-otp.dto';
 import { VerifyEmailOtpDto } from './dto/verify-email-otp.dto';
+import { SubmitIdentityVerificationDto } from './dto/submit-identity-verification.dto';
 
 @Controller('users')
 export class UsersController {
@@ -59,6 +60,15 @@ export class UsersController {
     @Body() dto: VerifyPhoneOtpDto,
   ) {
     return this.usersService.verifyPhoneOtp(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/identity-verification')
+  submitIdentityVerification(
+    @CurrentUser() user: { sub: string },
+    @Body() dto: SubmitIdentityVerificationDto,
+  ) {
+    return this.usersService.submitIdentityVerification(user.sub, dto);
   }
 
   @Public()

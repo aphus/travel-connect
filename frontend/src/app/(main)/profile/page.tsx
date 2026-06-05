@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,7 +19,8 @@ import {
     Mail,
     Phone,
     ShieldCheck,
-    UserCheck
+    UserCheck,
+    UploadCloud
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,7 +43,9 @@ import {
     sendEmailOtp,
     sendPhoneOtp,
     storeAuthUser,
+    submitIdentityVerification,
     updateCurrentUser,
+    uploadImage,
     verifyEmailOtp,
     verifyPhoneOtp,
     type AuthUser,
@@ -51,8 +55,6 @@ import { getUserInitials } from "@/lib/user";
 import UserReviews from "@/components/review/UserReviews";
 import RatingStars from "@/components/review/RatingStars";
 import { getUserReviews, type UserReview } from "@/services/reviews";
-import { uploadImage } from "@/services/auth";
-
 // IMPORT THÊM ĐỒ NGHỀ CHO CHUYẾN ĐI
 import { getMyCreatedTrips, getMyJoinedTrips, tripToCardData, type Trip } from "@/services/trips";
 import TripCard from "@/components/trip/TripCard";
@@ -106,7 +108,7 @@ function getProfileCompletion(user: AuthUser | null) {
         hasProfileValue(user.dateOfBirth),
         hasProfileValue(user.city),
         hasProfileValue(user.emergencyContactPhone),
-        hasProfileValue(user.bio) || hasProfileValue(user.travelStyle),
+        Boolean(user.identityVerified),
     ];
     const completed = criteria.filter(Boolean).length;
 
@@ -119,6 +121,7 @@ function TrustStatusItem({
     verified,
     detail,
     statusLabel,
+    statusTone,
     action,
 }: {
     icon: React.ElementType;
@@ -126,8 +129,17 @@ function TrustStatusItem({
     verified: boolean;
     detail?: string;
     statusLabel?: string;
+    statusTone?: "success" | "warning" | "danger" | "neutral";
     action?: React.ReactNode;
 }) {
+    const tone = statusTone ?? (verified ? "success" : "neutral");
+    const statusClassName = {
+        success: "bg-emerald-100 text-emerald-700",
+        warning: "bg-amber-100 text-amber-700",
+        danger: "bg-red-100 text-red-700",
+        neutral: "bg-slate-100 text-slate-500",
+    }[tone];
+
     return (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -142,7 +154,7 @@ function TrustStatusItem({
                 </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusClassName}`}>
                     {statusLabel ?? (verified ? "Đã xác minh" : "Chưa xác minh")}
                 </span>
                 {action}
@@ -182,6 +194,13 @@ export default function EnhancedProfilePage() {
     const [otpCode, setOtpCode] = useState("");
     const [phoneOtpMessage, setPhoneOtpMessage] = useState("");
     const [phoneOtpError, setPhoneOtpError] = useState("");
+    const [isIdentityDialogOpen, setIsIdentityDialogOpen] = useState(false);
+    const [identityDocumentFile, setIdentityDocumentFile] = useState<File | null>(null);
+    const [identityPreviewUrl, setIdentityPreviewUrl] = useState("");
+    const [identityTermsAccepted, setIdentityTermsAccepted] = useState(false);
+    const [isSubmittingIdentity, setIsSubmittingIdentity] = useState(false);
+    const [identityMessage, setIdentityMessage] = useState("");
+    const [identityError, setIdentityError] = useState("");
 
     const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
@@ -298,6 +317,14 @@ export default function EnhancedProfilePage() {
             isMounted = false;
         };
     }, [reset, router]);
+
+    useEffect(() => {
+        return () => {
+            if (identityPreviewUrl) {
+                URL.revokeObjectURL(identityPreviewUrl);
+            }
+        };
+    }, [identityPreviewUrl]);
 
     const onSubmit = async (data: ProfileFormValues) => {
         setStatusMessage("");
@@ -449,6 +476,95 @@ export default function EnhancedProfilePage() {
         }
     };
 
+    const resetIdentityVerificationState = () => {
+        if (identityPreviewUrl) {
+            URL.revokeObjectURL(identityPreviewUrl);
+        }
+        setIdentityDocumentFile(null);
+        setIdentityPreviewUrl("");
+        setIdentityTermsAccepted(false);
+        setIdentityMessage("");
+        setIdentityError("");
+    };
+
+    const handleIdentityDialogOpenChange = (open: boolean) => {
+        setIsIdentityDialogOpen(open);
+        if (!open) resetIdentityVerificationState();
+    };
+
+    const handleIdentityDocumentChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const file = event.target.files?.[0] ?? null;
+
+        if (identityPreviewUrl) {
+            URL.revokeObjectURL(identityPreviewUrl);
+            setIdentityPreviewUrl("");
+        }
+
+        setIdentityError("");
+        setIdentityMessage("");
+
+        if (!file) {
+            setIdentityDocumentFile(null);
+            return;
+        }
+
+        if (!file.type.startsWith("image/")) {
+            setIdentityDocumentFile(null);
+            setIdentityError("Vui lòng chọn 1 ảnh demo để xác minh.");
+            event.target.value = "";
+            return;
+        }
+
+        setIdentityDocumentFile(file);
+        setIdentityPreviewUrl(URL.createObjectURL(file));
+    };
+
+    const handleSubmitIdentityVerification = async () => {
+        if (!identityDocumentFile || !identityTermsAccepted) return;
+
+        setIsSubmittingIdentity(true);
+        setIdentityError("");
+        setIdentityMessage("");
+
+        try {
+            const uploadResult = await uploadImage(identityDocumentFile);
+
+            if (!uploadResult.public_id) {
+                setIdentityError(
+                    "Upload ảnh chưa trả public_id. Backend upload cần trả public_id để gửi yêu cầu xác minh.",
+                );
+                return;
+            }
+
+            const result = await submitIdentityVerification({
+                documentUrl: uploadResult.url,
+                documentPublicId: uploadResult.public_id,
+            });
+            const updatedUser = await getCurrentUser();
+
+            setCurrentUser(updatedUser);
+            storeAuthUser(updatedUser);
+            reset(getProfileFormDefaults(updatedUser));
+            setIdentityMessage(result.message);
+            setIsIdentityDialogOpen(false);
+            resetIdentityVerificationState();
+        } catch (error) {
+            if (error instanceof ApiError && [401, 403].includes(error.status)) {
+                router.replace("/login");
+                return;
+            }
+            setIdentityError(
+                error instanceof ApiError
+                    ? error.message
+                    : "Không thể gửi yêu cầu xác minh danh tính.",
+            );
+        } finally {
+            setIsSubmittingIdentity(false);
+        }
+    };
+
     if (isLoadingProfile) {
         return (
             <div className="container mx-auto px-4 py-16 flex justify-center">
@@ -476,6 +592,30 @@ export default function EnhancedProfilePage() {
             ? "Đã xác minh"
             : "Chưa xác minh"
         : "Chưa cập nhật";
+    const identityStatus =
+        currentUser?.identityVerificationStatus ??
+        (currentUser?.identityVerified ? "approved" : "none");
+    const isIdentityVerified = Boolean(currentUser?.identityVerified);
+    const identityStatusLabel = isIdentityVerified
+        ? "Đã xác minh"
+        : identityStatus === "pending"
+            ? "Đang chờ duyệt"
+            : identityStatus === "rejected"
+                ? "Bị từ chối"
+                : "Chưa xác minh";
+    const identityStatusTone = isIdentityVerified
+        ? "success"
+        : identityStatus === "pending"
+            ? "warning"
+            : identityStatus === "rejected"
+                ? "danger"
+                : "neutral";
+    const identityDetail =
+        identityStatus === "rejected" && currentUser?.identityRejectReason
+            ? currentUser.identityRejectReason
+            : identityStatus === "pending"
+                ? "Yêu cầu đang chờ admin duyệt"
+                : undefined;
 
     return (
         <div className="container max-w-5xl mx-auto px-4 py-10">
@@ -733,6 +873,128 @@ export default function EnhancedProfilePage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog
+                open={isIdentityDialogOpen}
+                onOpenChange={handleIdentityDialogOpenChange}
+            >
+                <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">
+                            Xác minh danh tính nâng cao
+                        </DialogTitle>
+                        <DialogDescription>
+                            Vui lòng chỉ dùng ảnh demo trong môi trường đồ án. Không tải giấy tờ thật lên hệ thống demo.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-5">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                            <h4 className="mb-2 text-sm font-bold text-slate-800">
+                                Điều khoản sử dụng tài liệu định danh
+                            </h4>
+                            <ul className="space-y-2 text-sm font-medium text-slate-600">
+                                <li>Tài liệu chỉ dùng cho mục đích xác minh danh tính.</li>
+                                <li>Chỉ admin có quyền kiểm duyệt mới được xem.</li>
+                                <li>Tài liệu sẽ bị xóa sau khi admin duyệt hoặc từ chối.</li>
+                                <li>Public profile chỉ hiển thị trạng thái đã xác minh, không hiển thị tài liệu.</li>
+                                <li>Không sử dụng tài liệu thật trong môi trường demo.</li>
+                            </ul>
+                        </div>
+
+                        <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                            <input
+                                type="checkbox"
+                                className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600"
+                                checked={identityTermsAccepted}
+                                onChange={(event) => setIdentityTermsAccepted(event.target.checked)}
+                            />
+                            <span>
+                                Tôi đã đọc và đồng ý với điều khoản sử dụng tài liệu định danh.
+                            </span>
+                        </label>
+
+                        <div className="space-y-3">
+                            <Label
+                                htmlFor="identityDocument"
+                                className="text-sm font-bold text-slate-700"
+                            >
+                                Ảnh tài liệu demo
+                            </Label>
+                            <label className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center transition-colors hover:border-slate-400">
+                                {identityPreviewUrl ? (
+                                    <Image
+                                        src={identityPreviewUrl}
+                                        alt="Preview tài liệu demo"
+                                        width={420}
+                                        height={260}
+                                        unoptimized
+                                        className="max-h-56 rounded-md border border-slate-200 object-contain"
+                                    />
+                                ) : (
+                                    <>
+                                        <UploadCloud className="mb-3 h-9 w-9 text-slate-400" />
+                                        <span className="text-sm font-bold text-slate-700">
+                                            Chọn 1 ảnh demo
+                                        </span>
+                                        <span className="mt-1 text-xs font-medium text-slate-500">
+                                            Không tải giấy tờ thật trong môi trường demo.
+                                        </span>
+                                    </>
+                                )}
+                                <input
+                                    id="identityDocument"
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleIdentityDocumentChange}
+                                    disabled={isSubmittingIdentity}
+                                />
+                            </label>
+                        </div>
+
+                        {identityError && (
+                            <p className="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                {identityError}
+                            </p>
+                        )}
+                        {identityMessage && (
+                            <p className="rounded-md border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                                {identityMessage}
+                            </p>
+                        )}
+
+                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setIsIdentityDialogOpen(false)}
+                                disabled={isSubmittingIdentity}
+                            >
+                                Hủy
+                            </Button>
+                            <Button
+                                type="button"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                onClick={handleSubmitIdentityVerification}
+                                disabled={
+                                    !identityTermsAccepted ||
+                                    !identityDocumentFile ||
+                                    isSubmittingIdentity
+                                }
+                            >
+                                {isSubmittingIdentity ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang gửi...
+                                    </>
+                                ) : (
+                                    "Gửi yêu cầu"
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* --- THỐNG KÊ --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                 <Card className="border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab('reviews')}>
@@ -854,7 +1116,21 @@ export default function EnhancedProfilePage() {
                                     <TrustStatusItem
                                         icon={UserCheck}
                                         label="Danh tính"
-                                        verified={Boolean(currentUser?.identityVerified)}
+                                        verified={isIdentityVerified}
+                                        detail={identityDetail}
+                                        statusLabel={identityStatusLabel}
+                                        statusTone={identityStatusTone}
+                                        action={!isIdentityVerified && identityStatus !== "pending" ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8 rounded-full px-3 text-xs font-bold"
+                                                onClick={() => setIsIdentityDialogOpen(true)}
+                                            >
+                                                {identityStatus === "rejected" ? "Gửi lại" : "Xác minh"}
+                                            </Button>
+                                        ) : null}
                                     />
                                     <TrustStatusItem
                                         icon={ShieldCheck}
@@ -878,6 +1154,16 @@ export default function EnhancedProfilePage() {
                                 {!isProfileReady && needsAvatarForProfile && (
                                     <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
                                         Bạn cần cập nhật ảnh đại diện để hoàn thiện hồ sơ tin cậy.
+                                    </p>
+                                )}
+                                {identityStatus === "pending" && (
+                                    <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                                        Yêu cầu xác minh danh tính của bạn đang chờ admin duyệt.
+                                    </p>
+                                )}
+                                {identityStatus === "rejected" && (
+                                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                        Yêu cầu xác minh bị từ chối. Vui lòng gửi lại tài liệu demo phù hợp.
                                     </p>
                                 )}
                             </CardContent>

@@ -16,6 +16,12 @@ import { SendPhoneOtpDto } from './dto/send-phone-otp.dto';
 import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 import { SendEmailOtpDto } from './dto/send-email-otp.dto';
 import { VerifyEmailOtpDto } from './dto/verify-email-otp.dto';
+import { SubmitIdentityVerificationDto } from './dto/submit-identity-verification.dto';
+import {
+  IdentityVerificationRequest,
+  IdentityVerificationStatus,
+} from './entities/identity-verification-request.entity';
+import { UploadService } from '../upload/upload.service';
 
 type TripReliability = {
   completed_trips: number;
@@ -105,6 +111,9 @@ export class UsersService {
     private readonly tripsRepository: Repository<Trip>,
     @InjectRepository(JoinRequest)
     private readonly joinRequestsRepository: Repository<JoinRequest>,
+    @InjectRepository(IdentityVerificationRequest)
+    private readonly identityVerificationRequestsRepository: Repository<IdentityVerificationRequest>,
+    private readonly uploadService: UploadService,
   ) { }
 
   findAll() {
@@ -272,7 +281,10 @@ export class UsersService {
 
   async getPrivateById(userId: string) {
     const user = await this.findById(userId);
-    return this.toPrivateUser(user);
+    return {
+      ...this.toPrivateUser(user),
+      ...(await this.getPrivateIdentityVerificationInfo(userId)),
+    };
   }
 
   async getPublicById(userId: string) {
@@ -293,8 +305,61 @@ export class UsersService {
       user.phone_verified &&
       user.date_of_birth &&
       user.city?.trim() &&
-      user.emergency_contact_phone?.trim(),
+      user.emergency_contact_phone?.trim() &&
+      user.identity_verified,
     );
+  }
+
+  async submitIdentityVerification(
+    userId: string,
+    dto: SubmitIdentityVerificationDto,
+  ) {
+    const documentUrl = dto.document_url.trim();
+    const documentPublicId = dto.document_public_id.trim();
+
+    if (!documentUrl || !documentPublicId) {
+      throw new BadRequestException('Vui lòng cung cấp tài liệu xác minh.');
+    }
+
+    const user = await this.findById(userId);
+    const pendingRequest =
+      await this.identityVerificationRequestsRepository.findOne({
+        where: {
+          user_id: userId,
+          status: IdentityVerificationStatus.PENDING,
+        },
+        order: { submitted_at: 'DESC' },
+      });
+
+    if (pendingRequest?.document_public_id) {
+      await this.uploadService.deleteImage(pendingRequest.document_public_id);
+    }
+
+    const request =
+      pendingRequest ??
+      this.identityVerificationRequestsRepository.create({
+        user_id: userId,
+      });
+
+    request.document_url = documentUrl;
+    request.document_public_id = documentPublicId;
+    request.status = IdentityVerificationStatus.PENDING;
+    request.submitted_at = new Date();
+    request.reviewed_at = null;
+    request.reviewed_by_id = null;
+    request.reject_reason = null;
+
+    user.identity_verified = false;
+    user.profile_completed = false;
+
+    await this.usersRepository.save(user);
+    await this.identityVerificationRequestsRepository.save(request);
+
+    return {
+      status: IdentityVerificationStatus.PENDING,
+      message:
+        'Yêu cầu xác minh danh tính đã được gửi và đang chờ admin duyệt.',
+    };
   }
 
   async assertProfileCompleted(userId: string) {
@@ -368,6 +433,29 @@ export class UsersService {
         'OTP mock chỉ được dùng trong môi trường development.',
       );
     }
+  }
+
+  private async getPrivateIdentityVerificationInfo(userId: string) {
+    const latestRequest =
+      await this.identityVerificationRequestsRepository.findOne({
+        where: { user_id: userId },
+        order: { submitted_at: 'DESC', created_at: 'DESC' },
+      });
+
+    if (!latestRequest) {
+      return {
+        identity_verification_status: 'none',
+        identity_reject_reason: null,
+      };
+    }
+
+    return {
+      identity_verification_status: latestRequest.status,
+      identity_reject_reason:
+        latestRequest.status === IdentityVerificationStatus.REJECTED
+          ? latestRequest.reject_reason
+          : null,
+    };
   }
 
   private async getTripReliability(userId: string): Promise<TripReliability> {

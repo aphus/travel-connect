@@ -21,6 +21,8 @@ export type AuthUser = {
   emailVerified?: boolean;
   phoneVerified?: boolean;
   identityVerified?: boolean;
+  identityVerificationStatus?: "none" | "pending" | "approved" | "rejected";
+  identityRejectReason?: string | null;
   profileCompleted?: boolean;
   bannedUntil?: string | null;
 };
@@ -61,10 +63,26 @@ export async function uploadImage(file: File) {
   formData.append("folder", "trip_avatars");
   formData.append("file", file);
 
-  return fetchWrapper<{ url: string }>("/upload/image", {
+  return fetchWrapper<{ url: string; public_id?: string }>("/upload/image", {
     method: "POST",
     body: formData,
   });
+}
+
+export function submitIdentityVerification(payload: {
+  documentUrl: string;
+  documentPublicId: string;
+}) {
+  return fetchWrapper<{ status: "pending"; message: string }>(
+    "/users/me/identity-verification",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        document_url: payload.documentUrl,
+        document_public_id: payload.documentPublicId,
+      }),
+    },
+  );
 }
 
 export async function updateCurrentUser(payload: {
@@ -223,6 +241,10 @@ type RawAuthUser = {
   phone_verified?: boolean;
   identityVerified?: boolean;
   identity_verified?: boolean;
+  identityVerificationStatus?: "none" | "pending" | "approved" | "rejected";
+  identity_verification_status?: "none" | "pending" | "approved" | "rejected";
+  identityRejectReason?: string | null;
+  identity_reject_reason?: string | null;
   profileCompleted?: boolean;
   profile_completed?: boolean;
   bannedUntil?: string | null;
@@ -253,6 +275,10 @@ function normalizeAuthUser(user: RawAuthUser): AuthUser {
     emailVerified: user.emailVerified ?? user.email_verified,
     phoneVerified: user.phoneVerified ?? user.phone_verified,
     identityVerified: user.identityVerified ?? user.identity_verified,
+    identityVerificationStatus:
+      user.identityVerificationStatus ?? user.identity_verification_status,
+    identityRejectReason:
+      user.identityRejectReason ?? user.identity_reject_reason ?? null,
     profileCompleted: user.profileCompleted ?? user.profile_completed,
     bannedUntil: user.bannedUntil ?? user.banned_until ?? null,
   };
