@@ -1,15 +1,25 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ElementType, type ReactNode, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Award, Calendar, CheckCircle2, FolderPlus, Loader2, MapPin } from "lucide-react";
+import {
+  Award,
+  Calendar,
+  CheckCircle2,
+  FolderPlus,
+  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import RatingStars from "@/components/review/RatingStars";
 import UserReviews from "@/components/review/UserReviews";
 import TripCard from "@/components/trip/TripCard";
-import { getUserInitials } from "@/lib/user";
 import { ApiError } from "@/services/fetchWrapper";
 import { getUserReviews, type UserReview } from "@/services/reviews";
 import {
@@ -128,21 +138,26 @@ export default function PublicProfilePage() {
         <Avatar className="h-32 w-32 md:h-40 md:w-40 border-[6px] border-blue-50 shadow-sm rounded-full overflow-hidden">
           <AvatarImage src={user.avatarUrl || ""} className="object-cover w-full h-full" />
           <AvatarFallback className="bg-gradient-to-br from-blue-600 to-sky-500 text-white text-4xl font-bold rounded-full">
-            {getUserInitials(user)}
+            {getPublicUserInitials(user.fullName)}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 text-center md:text-left mt-2">
           <div className="flex flex-col md:flex-row items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-slate-900">{user.fullName}</h1>
-            <span className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm shadow-blue-100">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+            <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm ${user.identityVerified ? "bg-emerald-600 text-white shadow-emerald-100" : "bg-slate-100 text-slate-600 shadow-slate-50"}`}>
+              {user.identityVerified ? (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5" />
+              )}
+              {user.identityVerified ? "Đã xác minh danh tính" : "Chưa xác minh danh tính"}
             </span>
           </div>
 
           <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-slate-600 mb-4">
             <span className="flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-sky-600" /> Vietnam
+              <MapPin className="h-4 w-4 text-sky-600" /> {user.city || "Chưa cập nhật thành phố"}
             </span>
             <span className="hidden md:inline text-slate-300">•</span>
             <span className="flex items-center gap-1.5">
@@ -199,13 +214,80 @@ export default function PublicProfilePage() {
 
       <div className="min-h-[300px]">
         {activeTab === "about" && (
-          <div className="animate-in fade-in duration-300">
+          <div className="animate-in fade-in duration-300 space-y-6">
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-2 mb-5">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                  <h3 className="text-lg font-bold text-slate-900">Độ tin cậy</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <TrustStatusItem
+                    icon={Mail}
+                    label="Email"
+                    verified={Boolean(user.emailVerified)}
+                    verifiedLabel="Đã xác minh"
+                    unverifiedLabel="Chưa xác minh"
+                  />
+                  <TrustStatusItem
+                    icon={Phone}
+                    label="Số điện thoại"
+                    verified={Boolean(user.phoneVerified)}
+                    verifiedLabel="Đã xác minh"
+                    unverifiedLabel="Chưa xác minh"
+                  />
+                  <TrustStatusItem
+                    icon={UserCheck}
+                    label="Danh tính"
+                    verified={Boolean(user.identityVerified)}
+                    verifiedLabel="Đã xác minh"
+                    unverifiedLabel="Chưa xác minh"
+                  />
+                  <TrustStatusItem
+                    icon={ShieldCheck}
+                    label="Hồ sơ"
+                    verified={Boolean(user.profileCompleted)}
+                    verifiedLabel="Đã hoàn thiện"
+                    unverifiedLabel="Chưa hoàn thiện"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="border-slate-200 shadow-sm">
               <CardContent className="p-8">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">Giới thiệu</h3>
                 <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
                   {user.bio || "Thành viên này chưa cập nhật thông tin giới thiệu."}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Phong cách du lịch</h3>
+                {user.travelStyle || user.travelPreferences ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">Phong cách</h4>
+                      <p className="text-sm text-slate-600">
+                        {user.travelStyle || "Chưa cập nhật"}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">
+                        Sở thích / quy tắc khi đi chung
+                      </h4>
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                        {user.travelPreferences || "Chưa cập nhật"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Người dùng chưa cập nhật phong cách du lịch.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -276,6 +358,43 @@ function TripGrid({
       )}
     </div>
   );
+}
+
+function TrustStatusItem({
+  icon: Icon,
+  label,
+  verified,
+  verifiedLabel,
+  unverifiedLabel,
+}: {
+  icon: ElementType;
+  label: string;
+  verified: boolean;
+  verifiedLabel: string;
+  unverifiedLabel: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="text-sm font-semibold text-slate-700">{label}</span>
+      </div>
+      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+        {verified ? verifiedLabel : unverifiedLabel}
+      </span>
+    </div>
+  );
+}
+
+function getPublicUserInitials(fullName: string) {
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+
+  if (words.length === 0) return "TC";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
 }
 
 function formatJoinedYear(value: string) {
