@@ -47,7 +47,7 @@ export default function LoginForm() {
 
     const redirectIfAuthenticated = async () => {
       if (await validateStoredToken()) {
-        if (isMounted) router.replace("/feed");
+        if (isMounted) router.replace("/");
       }
     };
 
@@ -72,7 +72,7 @@ export default function LoginForm() {
       setAccessToken(response.accessToken);
       storeAuthUser(response.user);
       setAuthFlash(`Đăng nhập thành công. Xin chào ${response.user.fullName}!`);
-      router.push("/feed");
+      router.push("/");
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
@@ -177,7 +177,9 @@ export default function LoginForm() {
       });
       setEmail(resetEmail);
       setPassword("");
-      setForgotMessage("Đặt lại mật khẩu thành công. Bạn có thể đăng nhập lại.");
+      setForgotMessage(
+        "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập lại.",
+      );
       window.setTimeout(() => handleForgotOpenChange(false), 900);
     } catch (error) {
       setForgotError(getAuthErrorMessage(error));
@@ -273,7 +275,9 @@ export default function LoginForm() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{getForgotDialogTitle()}</DialogTitle>
-            <DialogDescription>{getForgotDialogDescription()}</DialogDescription>
+            <DialogDescription>
+              {getForgotDialogDescription()}
+            </DialogDescription>
           </DialogHeader>
 
           {forgotStep === "email" && (
@@ -335,7 +339,9 @@ export default function LoginForm() {
               <Input
                 type="password"
                 value={resetConfirmPassword}
-                onChange={(event) => setResetConfirmPassword(event.target.value)}
+                onChange={(event) =>
+                  setResetConfirmPassword(event.target.value)
+                }
                 placeholder="Nhập lại mật khẩu mới"
                 autoComplete="new-password"
                 className="h-11"
