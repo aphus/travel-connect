@@ -1,38 +1,85 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { MapPin, Calendar, DollarSign, Users, Navigation, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Calendar, DollarSign, Users, Navigation, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import TripActionPanel from "./TripActionPanel";
 import { getStoredAuthUser } from "@/services/auth";
-import { getAccessToken } from "@/services/fetchWrapper";
 import type { TripRelation } from "@/services/trips";
 
-export default function TripDetail({ tripId, tripData, relation, onChanged }: { tripId: string, tripData: any, relation?: TripRelation | null, onChanged?: () => void }) {
-    const router = useRouter();
+type Companion = {
+    key: string;
+    userId: string;
+    name: string;
+    avatarUrl: string | null;
+    role: "LEADER" | "MEMBER";
+};
+
+function getInitial(name: string) {
+    return name.trim().charAt(0).toUpperCase() || "T";
+}
+
+function getCompanions(tripData: any): Companion[] {
+    const rawMembers = Array.isArray(tripData.members) ? tripData.members : [];
+    const companions = new Map<string, Companion>();
+    const leaderId = tripData.leader?.id || tripData.leaderId;
+    const leaderName = tripData.leader?.name || tripData.leader?.fullName || tripData.leader?.full_name || "Leader";
+    const leaderAvatar = tripData.leader?.avatar || tripData.leader?.avatarUrl || tripData.leader?.avatar_url || null;
+
+    if (leaderId) {
+        companions.set(leaderId, {
+            key: `leader-${leaderId}`,
+            userId: leaderId,
+            name: leaderName,
+            avatarUrl: leaderAvatar,
+            role: "LEADER",
+        });
+    }
+
+    rawMembers.forEach((member: any) => {
+        const user = member.user ?? member;
+        const userId = user.id || member.userId || member.user_id;
+        if (!userId) return;
+
+        const name =
+            user.fullName ||
+            user.full_name ||
+            user.name ||
+            member.name ||
+            member.fullName ||
+            member.full_name ||
+            "Thành viên TripConnect";
+        const avatarUrl =
+            user.avatarUrl ||
+            user.avatar_url ||
+            user.avatar ||
+            member.avatarUrl ||
+            member.avatar_url ||
+            null;
+        const role = member.role === "LEADER" || userId === leaderId ? "LEADER" : "MEMBER";
+
+        const current = companions.get(userId);
+        companions.set(userId, {
+            key: member.id || current?.key || userId,
+            userId,
+            name,
+            avatarUrl,
+            role: current?.role === "LEADER" ? "LEADER" : role,
+        });
+    });
+
+    return Array.from(companions.values()).sort((left, right) => {
+        if (left.role === right.role) return 0;
+        return left.role === "LEADER" ? -1 : 1;
+    });
+}
+
+export default function TripDetail({ tripData, relation, onChanged }: { tripId: string, tripData: any, relation?: TripRelation | null, onChanged?: () => void }) {
     const currentUser = getStoredAuthUser();
     const isLeader = relation?.isLeader ?? currentUser?.id === tripData.leaderId;
     const isMember = relation?.isMember ?? false;
-
-    const [members, setMembers] = useState<any[]>([]);
-
-    useEffect(() => {
-        if (isLeader || isMember) {
-            const token = getAccessToken();
-            fetch(`http://localhost:8000/api/trips/${tripId}/members`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) setMembers(data);
-                })
-                .catch(err => console.error("Lỗi lấy danh sách thành viên:", err));
-        }
-    }, [tripId, isLeader, isMember]);
+    const companions = getCompanions(tripData);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -86,63 +133,30 @@ export default function TripDetail({ tripId, tripData, relation, onChanged }: { 
                         <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800">
                             <Users className="text-orange-500 w-6 h-6" /> Những người bạn đồng hành
                         </h2>
-                        <div className="flex flex-wrap gap-5 items-center bg-white border border-slate-200 p-5 rounded-2xl shadow-sm min-h-[90px]">
-                            {(isLeader || isMember) ? (
-                                members.length > 0 ? (
-                                    members.map((member) => (
-                                        <div
-                                            key={member.id}
-                                            onClick={() => router.push(`/profile/${member.userId}`)}
-                                            className="flex flex-col items-center gap-1.5 cursor-pointer group"
-                                            title={member.name}
-                                        >
-                                            <Avatar className={`h-12 w-12 border-2 shadow-sm ring-2 ring-transparent transition-all ${member.role === 'leader' ? 'border-amber-400 group-hover:ring-amber-300' : 'border-white group-hover:ring-orange-400'}`}>
-                                                <AvatarImage src={member.avatarUrl || ""} />
-                                                <AvatarFallback className="font-bold bg-orange-100 text-orange-600">
-                                                    {member.name?.charAt(0).toUpperCase()}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-[11px] font-semibold text-slate-500 group-hover:text-orange-600 truncate max-w-[65px] text-center">
-                                                {member.name.split(' ').pop()}
-                                            </span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <span className="text-sm text-slate-500 font-medium">Đang tải danh sách...</span>
-                                )
-                            ) : (
-                                <>
-                                    <div
-                                        className="flex flex-col items-center gap-1.5 cursor-pointer group"
-                                        onClick={() => router.push(`/profile/${tripData.leaderId}`)}
-                                    >
-                                        <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-2 ring-amber-400 group-hover:ring-amber-500 transition-all">
-                                            <AvatarImage src={tripData.leader?.avatar_url || ""} />
-                                            <AvatarFallback className="font-bold bg-amber-100 text-amber-600">L</AvatarFallback>
-                                        </Avatar>
-                                        <span className="text-[11px] font-bold text-amber-600 truncate max-w-[65px] text-center">
-                                            Leader
-                                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 bg-white border border-slate-200 p-5 rounded-2xl shadow-sm min-h-[90px]">
+                            {companions.map((member) => (
+                                <Link
+                                    key={member.key}
+                                    href={`/profile/${member.userId}`}
+                                    className="group flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 transition-all hover:border-orange-200 hover:bg-orange-50"
+                                    title={member.name}
+                                >
+                                    <Avatar className={`h-12 w-12 shrink-0 border-2 shadow-sm ring-2 ring-transparent transition-all ${member.role === "LEADER" ? "border-amber-400 group-hover:ring-amber-300" : "border-white group-hover:ring-orange-300"}`}>
+                                        <AvatarImage src={member.avatarUrl || ""} />
+                                        <AvatarFallback className={`font-bold ${member.role === "LEADER" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-600"}`}>
+                                            {getInitial(member.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-slate-800 group-hover:text-orange-700">
+                                            {member.name}
+                                        </p>
+                                        <p className={`text-xs font-semibold ${member.role === "LEADER" ? "text-amber-600" : "text-slate-500"}`}>
+                                            {member.role === "LEADER" ? "Leader" : "Thành viên"}
+                                        </p>
                                     </div>
-
-                                    {Array.from({ length: Math.max(0, tripData.currentMembers - 1) }).map((_, i) => (
-                                        <div key={i} className="flex flex-col items-center gap-1.5">
-                                            <Avatar className="h-12 w-12 border-2 border-white shadow-sm ring-2 ring-slate-100">
-                                                <AvatarFallback className="font-bold bg-slate-100 text-slate-500">
-                                                    M{i + 1}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-[11px] font-medium text-slate-400">Ẩn danh</span>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
-
-                            {(tripData.maxMembers - tripData.currentMembers) > 0 && (
-                                <div className="h-12 w-12 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 text-slate-400 font-bold text-xs ml-2">
-                                    +{tripData.maxMembers - tripData.currentMembers}
-                                </div>
-                            )}
+                                </Link>
+                            ))}
                         </div>
                     </div>
 

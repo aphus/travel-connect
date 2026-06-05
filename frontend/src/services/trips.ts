@@ -22,6 +22,17 @@ export type TripLeader = {
   fullName: string;
   avatarUrl: string | null;
   trustScore: number;
+  identityVerified: boolean;
+  profileCompleted: boolean;
+};
+
+export type TripMemberUser = {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+  trustScore: number;
+  identityVerified: boolean;
+  profileCompleted: boolean;
 };
 
 export type Trip = {
@@ -42,6 +53,7 @@ export type Trip = {
   createdAt: string;
   leader: TripLeader | null;
   coverUrl?: string | null;
+  members: TripMember[];
 };
 
 export type JoinStatus =
@@ -79,6 +91,7 @@ export type TripMember = {
   trustScore: number;
   role: "LEADER" | "MEMBER";
   joinedAt: string;
+  user: TripMemberUser;
 };
 
 type RawTrip = {
@@ -110,6 +123,8 @@ type RawTrip = {
   leader?: RawLeader | null;
   coverUrl?: string | null;
   cover_url?: string | null;
+  members?: RawTripMember[] | null;
+  trip_members?: RawTripMember[] | null;
 };
 
 type RawLeader = {
@@ -120,6 +135,10 @@ type RawLeader = {
   avatar_url?: string | null;
   trustScore?: number | string;
   trust_score?: number | string;
+  identityVerified?: boolean;
+  identity_verified?: boolean;
+  profileCompleted?: boolean;
+  profile_completed?: boolean;
 };
 
 type RawTripRelation = {
@@ -150,6 +169,7 @@ type RawTripJoinRequest = {
 
 type RawTripMember = {
   id: string;
+  user?: RawTripMemberUser | null;
   userId?: string;
   user_id?: string;
   name?: string;
@@ -162,6 +182,22 @@ type RawTripMember = {
   role: "LEADER" | "MEMBER";
   joinedAt?: string;
   joined_at?: string;
+};
+
+type RawTripMemberUser = {
+  id: string;
+  fullName?: string;
+  full_name?: string;
+  name?: string;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
+  avatar?: string | null;
+  trustScore?: number | string;
+  trust_score?: number | string;
+  identityVerified?: boolean;
+  identity_verified?: boolean;
+  profileCompleted?: boolean;
+  profile_completed?: boolean;
 };
 
 export type CreateTripPayload = {
@@ -416,6 +452,7 @@ export function tripToDetailData(trip: Trip) {
       avatar: trip.leader?.avatarUrl ?? "",
       trustScore: trip.leader?.trustScore ?? 0,
     },
+    members: trip.members,
   };
 }
 
@@ -455,6 +492,9 @@ function normalizeTrip(trip: RawTrip): Trip {
     createdAt: trip.createdAt ?? trip.created_at ?? "",
     leader: trip.leader ? normalizeLeader(trip.leader) : null,
     coverUrl: trip.coverUrl ?? trip.cover_url ?? null,
+    members: (trip.members ?? trip.trip_members ?? [])
+      .map(normalizeTripMember)
+      .filter((member) => Boolean(member.userId)),
   };
 }
 
@@ -464,6 +504,8 @@ function normalizeLeader(leader: RawLeader): TripLeader {
     fullName: leader.fullName ?? leader.full_name ?? "Leader",
     avatarUrl: leader.avatarUrl ?? leader.avatar_url ?? null,
     trustScore: Number(leader.trustScore ?? leader.trust_score ?? 0),
+    identityVerified: leader.identityVerified ?? leader.identity_verified ?? false,
+    profileCompleted: leader.profileCompleted ?? leader.profile_completed ?? false,
   };
 }
 
@@ -483,18 +525,49 @@ function normalizeTripJoinRequest(request: RawTripJoinRequest): TripJoinRequest 
 }
 
 function normalizeTripMember(member: RawTripMember): TripMember {
+  const rawUser = member.user;
+  const userId = rawUser?.id ?? member.userId ?? member.user_id ?? "";
+  const fullName =
+    rawUser?.fullName ??
+    rawUser?.full_name ??
+    rawUser?.name ??
+    member.name ??
+    member.fullName ??
+    member.full_name ??
+    "Thành viên TripConnect";
+  const avatarUrl =
+    rawUser?.avatarUrl ??
+    rawUser?.avatar_url ??
+    rawUser?.avatar ??
+    member.avatarUrl ??
+    member.avatar_url ??
+    null;
+  const trustScore = Number(
+    rawUser?.trustScore ??
+    rawUser?.trust_score ??
+    member.trustScore ??
+    member.trust_score ??
+    0,
+  );
+
   return {
     id: member.id,
-    userId: member.userId ?? member.user_id ?? "",
-    name:
-      member.name ??
-      member.fullName ??
-      member.full_name ??
-      "Thành viên TripConnect",
-    avatarUrl: member.avatarUrl ?? member.avatar_url ?? null,
-    trustScore: Number(member.trustScore ?? member.trust_score ?? 0),
+    userId,
+    name: fullName,
+    avatarUrl,
+    trustScore,
     role: member.role,
     joinedAt: member.joinedAt ?? member.joined_at ?? "",
+    user: {
+      id: userId,
+      fullName,
+      avatarUrl,
+      trustScore,
+      identityVerified:
+        rawUser?.identityVerified ?? rawUser?.identity_verified ?? false,
+      profileCompleted:
+        rawUser?.profileCompleted ?? rawUser?.profile_completed ?? false,
+    },
   };
 }
 
