@@ -305,6 +305,7 @@ export default function EnhancedProfilePage() {
     const displayTrustScore = trustScore.toFixed(1);
     const profileCompletion = getProfileCompletion(currentUser);
     const isProfileReady = Boolean(currentUser?.profileCompleted);
+    const needsAvatarForProfile = !hasProfileValue(currentUser?.avatarUrl);
 
     return (
         <div className="container max-w-5xl mx-auto px-4 py-10">
@@ -554,6 +555,11 @@ export default function EnhancedProfilePage() {
                                             : "Bạn cần hoàn thiện hồ sơ tin cậy trước khi tạo hoặc tham gia chuyến đi."}
                                     </span>
                                 </div>
+                                {!isProfileReady && needsAvatarForProfile && (
+                                    <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                                        Bạn cần cập nhật ảnh đại diện để hoàn thiện hồ sơ tin cậy.
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
 

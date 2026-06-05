@@ -27,6 +27,8 @@ export class UsersService {
     'Vui lòng hoàn thiện hồ sơ tin cậy trước khi thực hiện hành động này.';
 
   toPrivateUser(user: User) {
+    const profileCompleted = this.isProfileCompleted(user);
+
     return {
       id: user.id,
       email: user.email,
@@ -48,7 +50,7 @@ export class UsersService {
       email_verified: user.email_verified,
       phone_verified: user.phone_verified,
       identity_verified: user.identity_verified,
-      profile_completed: user.profile_completed,
+      profile_completed: profileCompleted,
       created_at: user.created_at,
       updated_at: user.updated_at,
       bio: user.bio,
@@ -56,6 +58,8 @@ export class UsersService {
   }
 
   toPublicUser(user: User) {
+    const profileCompleted = this.isProfileCompleted(user);
+
     return {
       id: user.id,
       full_name: user.full_name,
@@ -72,7 +76,7 @@ export class UsersService {
       email_verified: user.email_verified,
       phone_verified: user.phone_verified,
       identity_verified: user.identity_verified,
-      profile_completed: user.profile_completed,
+      profile_completed: profileCompleted,
       created_at: user.created_at,
       updated_at: user.updated_at,
     };
@@ -181,7 +185,7 @@ export class UsersService {
 
   async assertProfileCompleted(userId: string) {
     const user = await this.findById(userId);
-    const profileCompleted = user.profile_completed && this.isProfileCompleted(user);
+    const profileCompleted = this.isProfileCompleted(user);
 
     if (!profileCompleted) {
       throw new ForbiddenException(this.profileCompletedMessage);
