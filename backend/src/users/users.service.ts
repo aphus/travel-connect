@@ -1,8 +1,25 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository } from 'typeorm';
+import { Brackets, DeepPartial, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { Trip, TripStatus } from '../trips/entities/trip.entity';
+import { JoinRequest, RequestStatus } from '../trips/entities/join_request.entity';
+import { TripMember } from '../trips/entities/trip_member.entity';
+
+type TripReliability = {
+  completed_trips: number;
+  created_trips: number;
+  cancelled_trips: number;
+  left_trips: number;
+  kicked_trips: number;
+  total_tracked_trips: number;
+  completion_rate: number;
+  cancel_leave_rate: number;
+  kick_rate: number;
+};
+
+const LEFT_TRIP_MESSAGE = '__TRIPCONNECT_LEFT_TRIP__';
 
 @Injectable()
 export class UsersService {
@@ -64,6 +81,10 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Trip)
+    private readonly tripsRepository: Repository<Trip>,
+    @InjectRepository(JoinRequest)
+    private readonly joinRequestsRepository: Repository<JoinRequest>,
   ) { }
 
   findAll() {
@@ -141,7 +162,10 @@ export class UsersService {
 
   async getPublicById(userId: string) {
     const user = await this.findById(userId);
-    return this.toPublicUser(user);
+    return {
+      ...this.toPublicUser(user),
+      trip_reliability: await this.getTripReliability(userId),
+    };
   }
 
   isProfileCompleted(user: User) {
@@ -208,5 +232,100 @@ export class UsersService {
   private normalizeOptionalString(value: string) {
     const trimmed = value.trim();
     return trimmed || null;
+  }
+
+  private async getTripReliability(userId: string): Promise<TripReliability> {
+    const [
+      completedTrips,
+      createdTrips,
+      cancelledTrips,
+      leftTrips,
+      kickedTrips,
+    ] = await Promise.all([
+      this.countCompletedTripsForUser(userId),
+      this.tripsRepository.count({ where: { leaderId: userId } }),
+      this.tripsRepository.count({
+        where: { leaderId: userId, status: TripStatus.CANCELLED },
+      }),
+      this.countLeftTripsForUser(userId),
+      this.countKickedTripsForUser(userId),
+    ]);
+
+    const totalTrackedTrips =
+      completedTrips + cancelledTrips + leftTrips + kickedTrips;
+
+    return {
+      completed_trips: completedTrips,
+      created_trips: createdTrips,
+      cancelled_trips: cancelledTrips,
+      left_trips: leftTrips,
+      kicked_trips: kickedTrips,
+      total_tracked_trips: totalTrackedTrips,
+      completion_rate: this.toRate(completedTrips, totalTrackedTrips),
+      cancel_leave_rate: this.toRate(
+        cancelledTrips + leftTrips,
+        totalTrackedTrips,
+      ),
+      kick_rate: this.toRate(kickedTrips, totalTrackedTrips),
+    };
+  }
+
+  private async countCompletedTripsForUser(userId: string) {
+    const result = await this.tripsRepository
+      .createQueryBuilder('trip')
+      .leftJoin(TripMember, 'member', 'member.trip_id = trip.id')
+      .select('COUNT(DISTINCT trip.id)', 'count')
+      .where('trip.status = :status', { status: TripStatus.COMPLETED })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('trip.leader_id = :userId', { userId }).orWhere(
+            'member.user_id = :userId',
+            { userId },
+          );
+        }),
+      )
+      .getRawOne<{ count: string }>();
+
+    return Number(result?.count ?? 0);
+  }
+
+  private countLeftTripsForUser(userId: string) {
+    // Mirrors TripsService leave tracking: a self-left approved request is canceled with this marker.
+    return this.joinRequestsRepository
+      .createQueryBuilder('request')
+      .where('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.CANCELED })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.message = :leftMessage', {
+            leftMessage: LEFT_TRIP_MESSAGE,
+          }).orWhere('request.processed_by = :userId', { userId });
+        }),
+      )
+      .getCount();
+  }
+
+  private countKickedTripsForUser(userId: string) {
+    // Mirrors TripsService remove tracking: leader removal cancels the approved request with processed_by != user.
+    return this.joinRequestsRepository
+      .createQueryBuilder('request')
+      .where('request.user_id = :userId', { userId })
+      .andWhere('request.status = :status', { status: RequestStatus.CANCELED })
+      .andWhere('request.processed_by IS NOT NULL')
+      .andWhere('request.processed_by != :userId', { userId })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('request.message IS NULL').orWhere(
+            'request.message != :leftMessage',
+            { leftMessage: LEFT_TRIP_MESSAGE },
+          );
+        }),
+      )
+      .getCount();
+  }
+
+  private toRate(value: number, total: number) {
+    if (total === 0) return 0;
+    return Math.round((value / total) * 100);
   }
 }

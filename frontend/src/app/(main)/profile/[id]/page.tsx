@@ -55,32 +55,42 @@ export default function PublicProfilePage() {
 
       try {
         const profile = await getUserProfile(params.id);
-        const [userReviews, createdTripsResult, joinedTripsResult] = await Promise.all([
-          getUserReviews(params.id).catch(() => [] as UserReview[]),
-          getUserCreatedTrips(params.id).catch(() => null),
-          getUserJoinedTrips(params.id).catch(() => null),
-        ]);
+        const [userReviews, createdTripsResult, joinedTripsResult] =
+          await Promise.all([
+            getUserReviews(params.id).catch(() => [] as UserReview[]),
+            getUserCreatedTrips(params.id).catch(() => null),
+            getUserJoinedTrips(params.id).catch(() => null),
+          ]);
 
         if (!isMounted) return;
 
         const createdTrips = createdTripsResult ?? [];
         const joinedTrips = joinedTripsResult ?? [];
         const uniqueTrips = Array.from(
-          new Map([...createdTrips, ...joinedTrips].map((trip) => [trip.id, trip])).values(),
+          new Map(
+            [...createdTrips, ...joinedTrips].map((trip) => [trip.id, trip]),
+          ).values(),
         );
         const upcomingTripsList = uniqueTrips
-          .filter((trip) => trip.status === "upcoming" || trip.status === "ongoing")
+          .filter(
+            (trip) => trip.status === "upcoming" || trip.status === "ongoing",
+          )
           .sort(
             (left, right) =>
-              new Date(left.startDate).getTime() - new Date(right.startDate).getTime(),
+              new Date(left.startDate).getTime() -
+              new Date(right.startDate).getTime(),
           );
-        const completedTrips = uniqueTrips.filter((trip) => trip.status === "completed");
+        const completedTrips = uniqueTrips.filter(
+          (trip) => trip.status === "completed",
+        );
 
         setUser(profile);
         setReviews(userReviews);
         setUpcomingTrips(upcomingTripsList);
         setTripsCompletedCount(completedTrips.length);
-        setTripsCreatedCount(createdTripsResult ? createdTrips.length : profile.tripsCreated);
+        setTripsCreatedCount(
+          createdTripsResult ? createdTrips.length : profile.tripsCreated,
+        );
         setCreatedTripsList(createdTrips);
         setCompletedTripsList(completedTrips);
       } catch (loadError) {
@@ -131,12 +141,16 @@ export default function PublicProfilePage() {
   const trustScore = user.trustScore ?? 0;
   const displayTrustScore = trustScore.toFixed(1);
   const shortName = user.fullName.split(" ").pop() || "thành viên";
+  const reliability = user.tripReliability;
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-10">
       <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
         <Avatar className="h-32 w-32 md:h-40 md:w-40 border-[6px] border-blue-50 shadow-sm rounded-full overflow-hidden">
-          <AvatarImage src={user.avatarUrl || ""} className="object-cover w-full h-full" />
+          <AvatarImage
+            src={user.avatarUrl || ""}
+            className="object-cover w-full h-full"
+          />
           <AvatarFallback className="bg-gradient-to-br from-blue-600 to-sky-500 text-white text-4xl font-bold rounded-full">
             {getPublicUserInitials(user.fullName)}
           </AvatarFallback>
@@ -144,55 +158,88 @@ export default function PublicProfilePage() {
 
         <div className="flex-1 text-center md:text-left mt-2">
           <div className="flex flex-col md:flex-row items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-slate-900">{user.fullName}</h1>
-            <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm ${user.identityVerified ? "bg-emerald-600 text-white shadow-emerald-100" : "bg-slate-100 text-slate-600 shadow-slate-50"}`}>
+            <h1 className="text-3xl font-bold text-slate-900">
+              {user.fullName}
+            </h1>
+            <span
+              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm ${user.identityVerified ? "bg-emerald-600 text-white shadow-emerald-100" : "bg-slate-100 text-slate-600 shadow-slate-50"}`}
+            >
               {user.identityVerified ? (
                 <CheckCircle2 className="h-3.5 w-3.5" />
               ) : (
                 <ShieldCheck className="h-3.5 w-3.5" />
               )}
-              {user.identityVerified ? "Đã xác minh danh tính" : "Chưa xác minh danh tính"}
+              {user.identityVerified
+                ? "Đã xác minh danh tính"
+                : "Chưa xác minh danh tính"}
             </span>
           </div>
 
           <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-slate-600 mb-4">
             <span className="flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-sky-600" /> {user.city || "Chưa cập nhật thành phố"}
+              <MapPin className="h-4 w-4 text-sky-600" />{" "}
+              {user.city || "Chưa cập nhật thành phố"}
             </span>
             <span className="hidden md:inline text-slate-300">•</span>
             <span className="flex items-center gap-1.5">
-              <Calendar className="h-4 w-4 text-indigo-600" /> Thành viên từ {formatJoinedYear(user.createdAt)}
+              <Calendar className="h-4 w-4 text-indigo-600" /> Thành viên từ{" "}
+              {formatJoinedYear(user.createdAt)}
             </span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab("reviews")}>
+        <Card
+          className="border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+          onClick={() => setActiveTab("reviews")}
+        >
           <CardContent className="p-6 flex flex-col items-center justify-center">
-            <RatingStars rating={trustScore} className="mb-2" starClassName="h-6 w-6" />
-            <span className="text-3xl font-bold text-amber-950 mb-1">{displayTrustScore}</span>
-            <span className="text-xs text-amber-700 uppercase tracking-wider font-semibold">Average Rating</span>
+            <RatingStars
+              rating={trustScore}
+              className="mb-2"
+              starClassName="h-6 w-6"
+            />
+            <span className="text-3xl font-bold text-amber-950 mb-1">
+              {displayTrustScore}
+            </span>
+            <span className="text-xs text-amber-700 uppercase tracking-wider font-semibold">
+              Average Rating
+            </span>
           </CardContent>
         </Card>
 
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab("completed")}>
+        <Card
+          className="border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+          onClick={() => setActiveTab("completed")}
+        >
           <CardContent className="p-6 flex flex-col items-center justify-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
               <Award className="h-6 w-6" />
             </div>
-            <span className="text-3xl font-bold text-emerald-950 mb-1">{tripsCompletedCount}</span>
-            <span className="text-xs text-emerald-700 uppercase tracking-wider font-semibold">Trips Completed</span>
+            <span className="text-3xl font-bold text-emerald-950 mb-1">
+              {tripsCompletedCount}
+            </span>
+            <span className="text-xs text-emerald-700 uppercase tracking-wider font-semibold">
+              Trips Completed
+            </span>
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" onClick={() => setActiveTab("created")}>
+        <Card
+          className="border-blue-200 bg-gradient-to-br from-blue-50 via-white to-white shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+          onClick={() => setActiveTab("created")}
+        >
           <CardContent className="p-6 flex flex-col items-center justify-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
               <FolderPlus className="h-6 w-6" />
             </div>
-            <span className="text-3xl font-bold text-blue-950 mb-1">{tripsCreatedCount}</span>
-            <span className="text-xs text-blue-700 uppercase tracking-wider font-semibold">Trips Created</span>
+            <span className="text-3xl font-bold text-blue-950 mb-1">
+              {tripsCreatedCount}
+            </span>
+            <span className="text-xs text-blue-700 uppercase tracking-wider font-semibold">
+              Trips Created
+            </span>
           </CardContent>
         </Card>
       </div>
@@ -219,7 +266,9 @@ export default function PublicProfilePage() {
               <CardContent className="p-8">
                 <div className="flex items-center gap-2 mb-5">
                   <ShieldCheck className="h-5 w-5 text-emerald-600" />
-                  <h3 className="text-lg font-bold text-slate-900">Độ tin cậy</h3>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Độ tin cậy
+                  </h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <TrustStatusItem
@@ -256,20 +305,83 @@ export default function PublicProfilePage() {
 
             <Card className="border-slate-200 shadow-sm">
               <CardContent className="p-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Giới thiệu</h3>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Lịch sử hành vi chuyến đi
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      Thống kê dựa trên các sự kiện tham gia chuyến đi đã được hệ thống ghi nhận.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                    Tổng lượt ghi nhận: {reliability.totalTrackedTrips}
+                  </span>
+                </div>
+
+                {reliability.totalTrackedTrips > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <ReliabilityStat
+                      label="Tỷ lệ hoàn thành"
+                      value={`${reliability.completionRate}%`}
+                      detail={`${reliability.completedTrips} chuyến hoàn thành`}
+                      tone="emerald"
+                    />
+                    <ReliabilityStat
+                      label="Rời/hủy chuyến"
+                      value={`${reliability.cancelLeaveRate}%`}
+                      detail={`${reliability.cancelledTrips + reliability.leftTrips} lần trên ${reliability.totalTrackedTrips} lượt ghi nhận`}
+                      tone="amber"
+                    />
+                    <ReliabilityStat
+                      label="Bị kick khỏi chuyến"
+                      value={`${reliability.kickRate}%`}
+                      detail={`${reliability.kickedTrips} lần trên ${reliability.totalTrackedTrips} lượt ghi nhận`}
+                      tone="rose"
+                    />
+                    <ReliabilityStat
+                      label="Tổng lượt ghi nhận"
+                      value={String(reliability.totalTrackedTrips)}
+                      detail="Dựa trên các sự kiện chuyến đi đã ghi nhận"
+                      tone="slate"
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                    <p>Chưa có đủ dữ liệu lịch sử chuyến đi.</p>
+                    {reliability.createdTrips > 0 && (
+                      <p className="mt-2 font-semibold text-slate-600">
+                        Người dùng này đã tạo {reliability.createdTrips} chuyến.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">
+                  Giới thiệu
+                </h3>
                 <div className="text-slate-600 leading-relaxed whitespace-pre-wrap">
-                  {user.bio || "Thành viên này chưa cập nhật thông tin giới thiệu."}
+                  {user.bio ||
+                    "Thành viên này chưa cập nhật thông tin giới thiệu."}
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-slate-200 shadow-sm">
               <CardContent className="p-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Phong cách du lịch</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">
+                  Phong cách du lịch
+                </h3>
                 {user.travelStyle || user.travelPreferences ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900 mb-2">Phong cách</h4>
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">
+                        Phong cách
+                      </h4>
                       <p className="text-sm text-slate-600">
                         {user.travelStyle || "Chưa cập nhật"}
                       </p>
@@ -351,7 +463,9 @@ function TripGrid({
         <Card className="border-slate-200 shadow-sm border-dashed">
           <CardContent className="p-16 flex flex-col items-center justify-center text-slate-500 text-center">
             {emptyIcon}
-            <h3 className="text-lg font-bold text-slate-700 mb-1">{emptyTitle}</h3>
+            <h3 className="text-lg font-bold text-slate-700 mb-1">
+              {emptyTitle}
+            </h3>
             <p className="text-sm">{emptyDescription}</p>
           </CardContent>
         </Card>
@@ -381,9 +495,40 @@ function TrustStatusItem({
         </span>
         <span className="text-sm font-semibold text-slate-700">{label}</span>
       </div>
-      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+      <span
+        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${verified ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+      >
         {verified ? verifiedLabel : unverifiedLabel}
       </span>
+    </div>
+  );
+}
+
+function ReliabilityStat({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: "emerald" | "amber" | "rose" | "slate";
+}) {
+  const toneClass = {
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    rose: "border-rose-200 bg-rose-50 text-rose-900",
+    slate: "border-slate-200 bg-slate-50 text-slate-900",
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border px-4 py-4 ${toneClass}`}>
+      <p className="text-xs font-bold uppercase tracking-wide opacity-70">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
+      <p className="mt-1 text-xs font-semibold opacity-70">{detail}</p>
     </div>
   );
 }
