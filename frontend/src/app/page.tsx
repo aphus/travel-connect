@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PlusCircle, Search, DollarSign, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, PlusCircle, Search, DollarSign, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TripCard from "@/components/trip/TripCard";
@@ -20,6 +20,7 @@ import { listTrips, tripToCardData, type Trip } from "@/services/trips";
 
 export default function MegaHomePage() {
   const router = useRouter();
+  const tripsScrollerRef = useRef<HTMLDivElement>(null);
 
   const [location, setLocation] = useState("");
   const [destinationPlace, setDestinationPlace] = useState("");
@@ -110,6 +111,17 @@ export default function MegaHomePage() {
   };
 
   const cardTrips = trips.map(tripToCardData);
+  const displayedTrips = cardTrips.slice(0, 10);
+
+  const scrollTrips = (direction: -1 | 1) => {
+    const scroller = tripsScrollerRef.current;
+    if (!scroller) return;
+
+    scroller.scrollBy({
+      left: direction * Math.min(scroller.clientWidth * 0.85, 680),
+      behavior: "smooth",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-12 font-sans">
@@ -197,12 +209,30 @@ export default function MegaHomePage() {
 
       {/* 4. BẢNG TIN CHUYẾN ĐI */}
       <div className="container mx-auto px-4 mt-8 max-w-6xl">
-        <div className="flex justify-between items-end mb-8 border-b pb-4 border-slate-200">
+        <div className="flex justify-between items-end gap-4 mb-8 border-b pb-4 border-slate-200">
           <div>
             <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Chuyến đi chưa bắt đầu</h2>
             <p className="text-slate-500 mt-1">Các hành trình đang mở từ database TripConnect.</p>
           </div>
-          <Link href="/feed" className="text-blue-600 font-bold hover:underline hidden sm:block">Xem tất cả &rarr;</Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => scrollTrips(-1)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+              aria-label="Cuộn chuyến đi sang trái"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTrips(1)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+              aria-label="Cuộn chuyến đi sang phải"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+            <Link href="/feed" className="ml-1 text-blue-600 font-bold hover:underline">Xem tất cả &rarr;</Link>
+          </div>
         </div>
 
         {isLoadingTrips ? (
@@ -211,9 +241,16 @@ export default function MegaHomePage() {
           <div className="rounded-2xl border border-red-100 bg-red-50 px-6 py-12 text-center font-semibold text-red-600">
             {tripsError}
           </div>
-        ) : cardTrips.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {cardTrips.map((trip) => <TripCard key={trip.id} trip={trip} />)}
+        ) : displayedTrips.length > 0 ? (
+          <div
+            ref={tripsScrollerRef}
+            className="flex gap-6 overflow-x-auto scroll-smooth pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {displayedTrips.map((trip) => (
+              <div key={trip.id} className="w-[300px] min-w-[300px] sm:w-[320px] sm:min-w-[320px]">
+                <TripCard trip={trip} />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center font-medium text-slate-500">
